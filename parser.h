@@ -18,7 +18,7 @@ struct Array {
 
   void Delete() { delete[] buf_; }
 
-  uint8_t* start() { return buf_ + start_; }
+  uint8_t* start() const { return buf_ + start_; }
   void add_start(size_t start) {
     start_ += start;
     assert(size() >= 0);
@@ -27,12 +27,13 @@ struct Array {
     }
   }
 
-  size_t size() { return original_size_ - start_; }
+  size_t size() const { return original_size_ - start_; }
 
-  bool valid() { return valid_; }
+  bool valid() const { return valid_; }
 
-  std::string to_string() {
+  std::string to_string() const {
     std::stringstream repr;
+    repr << "buf: " << buf_ << std::endl;
     repr << "original size: " << original_size_ << std::endl;
     repr << "start: " << start_ << std::endl;
     return repr.str();
@@ -42,7 +43,6 @@ struct Array {
   uint8_t* buf_;
   size_t original_size_;
   size_t start_;
-
   bool valid_ = true;
 };
 
@@ -69,60 +69,49 @@ class Parser {
 
   std::vector<uint8_t> GetNext() {
     assert(state_ == State::BODY && HasNext() == true);
-    std::vector<uint8_t> msg(next_msg_length_);
-    size_t msg_end = 0;
 
-    for (auto& buf : buffers_) {
-      if (!buf.valid()) {
-        continue;
-      }
-
-      size_t needed = std::min(buf.size(), next_msg_length_ - msg_end);
-      std::memcpy(msg.data() + msg_end, buf.start(), needed);
-      msg_end += needed;
-      buf.add_start(needed);
-      buffers_total_length_ -= needed;
-
-      if (msg_end == next_msg_length_) {
-        break;
-      }
-    }
-    assert(msg_end == next_msg_length_);
-
-    FreeBuffers();
+    auto msg = ExtractBytes(next_msg_length_);
     state_ = State::HEADER;
     return std::move(msg);
   }
 
  private:
+  // Extracts and returns n bytes from buffers.
+  // It also deletes all buffers that are empty.
+  std::vector<uint8_t> ExtractBytes(size_t n) {
+    assert(n <= buffers_total_length_);
+
+    std::vector<uint8_t> bytes(n);
+    size_t bytes_end = 0;
+
+    for (auto& buf : buffers_) {
+      assert(buf.valid() == true);
+
+      auto read = std::min(buf.size(), n - bytes_end);
+      std::memcpy(bytes.data() + bytes_end, buf.start(), read);
+      bytes_end += read;
+      buf.add_start(read);
+      buffers_total_length_ -= read;
+      if (bytes_end == n) {
+        break;
+      }
+    }
+
+    assert(bytes_end == n);
+    FreeBuffers();
+
+    return bytes;
+  }
+
   bool TryParseHeader() {
     if (LENGTH_SIZE > buffers_total_length_) {
       return false;
     }
 
-    std::array<uint8_t, LENGTH_SIZE> header;
-    size_t header_end = 0;
-
-    for (int i = 0; i < buffers_.size(); ++i) {
-      auto& buf = buffers_[i];
-      assert(buf.valid() == true);
-
-      auto read = std::min(buf.size(), LENGTH_SIZE - header_end);
-      std::memcpy(header.data() + header_end, buf.start(), read);
-      header_end += read;
-      buf.add_start(read);
-      buffers_total_length_ -= read;
-
-      assert(header_end <= LENGTH_SIZE);
-
-      if (header_end == LENGTH_SIZE) {
-        next_msg_length_ = ParseSize(header.data());
-        state_ = State::BODY;
-        return true;
-      }
-    }
-
-    return false;
+    auto bytes = ExtractBytes(LENGTH_SIZE);
+    next_msg_length_ = ParseSize(bytes.data());
+    state_ = State::BODY;
+    return true;
   }
 
   void FreeBuffers() {
