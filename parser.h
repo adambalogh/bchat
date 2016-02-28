@@ -71,6 +71,9 @@ struct Array {
 //   }
 //
 class Parser {
+ private:
+  enum class State { HEADER, BODY };
+
  public:
   ~Parser() {
     for (auto& b : buffers_) {
@@ -78,17 +81,21 @@ class Parser {
     }
   }
 
+  // Sink takes ownership of buf
   void Sink(uint8_t* const buf, const size_t size) { AddBuffer({buf, size}); }
 
+  // Returns true if there is a message that can be extracted
   bool HasNext() {
     if (state_ == State::HEADER) {
-      if (!TryParseHeader()) {
+      if (!TryParseLength()) {
         return false;
       }
     }
     return next_msg_length_ <= buffers_total_length_;
   }
 
+  // Returns the next available message.
+  // It should only be called if HasNext returns true.
   std::vector<uint8_t> GetNext() {
     assert(state_ == State::BODY && HasNext() == true);
 
@@ -125,7 +132,7 @@ class Parser {
     return bytes;
   }
 
-  bool TryParseHeader() {
+  bool TryParseLength() {
     if (LENGTH_SIZE > buffers_total_length_) {
       return false;
     }
@@ -136,6 +143,7 @@ class Parser {
     return true;
   }
 
+  // Deletes and frees all buffers that are no longer usable
   void FreeBuffers() {
     int valid_buf_index = 0;
     for (int i = 0; i < buffers_.size(); ++i) {
@@ -151,6 +159,7 @@ class Parser {
     buffers_.erase(buffers_.begin(), buffers_.begin() + valid_buf_index);
   }
 
+  // Converts byte array to size_t
   size_t ParseSize(uint8_t* header) {
     size_t size = 0;
     for (int i = 0; i < LENGTH_SIZE; ++i) {
@@ -164,12 +173,14 @@ class Parser {
     buffers_.push_back(a);
   }
 
-  enum class State { HEADER, BODY };
-
+ private:
   State state_ = State::HEADER;
 
   std::vector<Array> buffers_;
+
+  // Indicates the total length of all the arrays in buffers_
   size_t buffers_total_length_ = 0;
 
+  // Size of the next message in bytes
   size_t next_msg_length_;
 };
