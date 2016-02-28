@@ -10,11 +10,10 @@
 
 #include <uv.h>
 
+#include "parser.h"
+
 #define DEFAULT_PORT 7002
 #define DEFAULT_BACKLOG 128
-
-uv_pipe_t file_pipe;
-auto f = fopen("received.dat", "w");
 
 class Connection;
 
@@ -74,9 +73,12 @@ class Connection final {
       count_ += nread;
       printf("Read: %d\n", count_);
 
-      auto req = new WriteReq(this, uv_buf_init(buf->base, nread));
-      uv_write(req->req(), (uv_stream_t *)&file_pipe, req->buf(), 1,
-               OnWriteFinished);
+      parser_.Sink((uint8_t *)buf->base, nread);
+      while (parser_.HasNext()) {
+        auto msg = parser_.GetNext();
+        std::string msg_str{(char *)msg.data(), msg.size()};
+        printf("%s\n", msg_str.c_str());
+      }
     }
   }
 
@@ -111,6 +113,8 @@ class Connection final {
   // uv_handle_t*, a la C inheritance
   uv_tcp_t socket_;
 
+  Parser parser_;
+
   int count_{0};
 };
 
@@ -123,9 +127,6 @@ class Server {
   }
 
   int Start() {
-    uv_pipe_init(loop_, &file_pipe, 0);
-    uv_pipe_open(&file_pipe, fileno(f));
-
     int r = uv_listen((uv_stream_t *)this, DEFAULT_BACKLOG, OnNewConnection);
     if (r) {
       fprintf(stderr, "Listen error %s\n", uv_strerror(r));
