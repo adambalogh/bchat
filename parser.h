@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <vector>
 #include <inttypes.h>
 
@@ -30,9 +31,16 @@ struct Array {
 
   bool valid() { return valid_; }
 
+  std::string to_string() {
+    std::stringstream repr;
+    repr << "original size: " << original_size_ << std::endl;
+    repr << "start: " << start_ << std::endl;
+    return repr.str();
+  }
+
  private:
-  uint8_t* const buf_;
-  const size_t original_size_;
+  uint8_t* buf_;
+  size_t original_size_;
   size_t start_;
 
   bool valid_ = true;
@@ -48,6 +56,8 @@ class Parser {
     }
   }
 
+  void Sink(uint8_t* const buf, const size_t size) { AddBuffer({buf, size}); }
+
   bool HasNext() {
     if (state_ == State::HEADER) {
       if (!TryParseHeader()) {
@@ -57,8 +67,34 @@ class Parser {
     return next_msg_length_ <= buffers_total_length_;
   }
 
-  void Sink(uint8_t* const buf, const size_t size) { AddBuffer({buf, size}); }
+  std::vector<uint8_t> GetNext() {
+    assert(state_ == State::BODY && HasNext() == true);
+    std::vector<uint8_t> msg(next_msg_length_);
+    size_t msg_end = 0;
 
+    for (auto& buf : buffers_) {
+      if (!buf.valid()) {
+        continue;
+      }
+
+      size_t needed = std::min(buf.size(), next_msg_length_ - msg_end);
+      std::memcpy(msg.data() + msg_end, buf.start(), needed);
+      msg_end += needed;
+      buf.add_start(needed);
+      buffers_total_length_ -= needed;
+
+      if (msg_end == next_msg_length_) {
+        break;
+      }
+    }
+    assert(msg_end == next_msg_length_);
+
+    FreeBuffers();
+    state_ = State::HEADER;
+    return std::move(msg);
+  }
+
+ private:
   bool TryParseHeader() {
     if (LENGTH_SIZE > buffers_total_length_) {
       return false;
@@ -89,7 +125,21 @@ class Parser {
     return false;
   }
 
-  // private:
+  void FreeBuffers() {
+    int valid_buf_index = 0;
+    for (int i = 0; i < buffers_.size(); ++i) {
+      if (!buffers_[i].valid()) {
+        valid_buf_index = i + 1;
+        buffers_[i].Delete();
+      } else {
+        valid_buf_index = i;
+        break;
+      }
+    }
+
+    buffers_.erase(buffers_.begin(), buffers_.begin() + valid_buf_index);
+  }
+
   size_t ParseSize(uint8_t* header) {
     size_t size = 0;
     for (int i = 0; i < LENGTH_SIZE; ++i) {
@@ -102,7 +152,6 @@ class Parser {
     buffers_total_length_ += a.size();
     buffers_.push_back(a);
   }
-  void SwitchToBody() { state_ = State::BODY; }
 
   enum class State { HEADER, BODY };
 
