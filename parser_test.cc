@@ -8,11 +8,7 @@ TEST(Parser, Empty) {
 }
 
 TEST(Parser, ZeroMsgLength) {
-  uint8_t* buf = new uint8_t[4];
-  buf[0] = 0;
-  buf[1] = 0;
-  buf[2] = 0;
-  buf[3] = 0;
+  uint8_t* buf = new uint8_t[4]{0, 0, 0, 0};
 
   Parser p;
   p.Sink(buf, 4);
@@ -21,11 +17,7 @@ TEST(Parser, ZeroMsgLength) {
 }
 
 TEST(Parser, Length) {
-  uint8_t* buf = new uint8_t[4];
-  buf[0] = 0;
-  buf[1] = 0;
-  buf[2] = 0;
-  buf[3] = 10;
+  uint8_t* buf = new uint8_t[4]{0, 0, 0, 10};
 
   Parser p;
   p.Sink(buf, 4);
