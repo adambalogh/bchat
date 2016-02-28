@@ -10,7 +10,7 @@
 
 #include <uv.h>
 
-#define DEFAULT_PORT 7001
+#define DEFAULT_PORT 7002
 #define DEFAULT_BACKLOG 128
 
 uv_pipe_t file_pipe;
@@ -24,6 +24,8 @@ class WriteReq {
       : conn_(conn), buf_(std::move(buf)) {
     assert((void *)this == &req_);
   }
+
+  ~WriteReq() { free(buf_.base); }
 
   Connection *conn() { return conn_; }
   uv_buf_t *buf() { return &buf_; }
@@ -42,7 +44,10 @@ class Connection final {
     assert((void *)&socket_ == (void *)this);
   }
 
-  ~Connection() { std::cout << "Deleted" << std::endl; }
+  ~Connection() {
+    std::cout << "Deleted" << std::endl;
+    exit(0);
+  }
 
   void inline Close() { uv_close((uv_handle_t *)this, Delete); }
 
@@ -75,10 +80,7 @@ class Connection final {
     }
   }
 
-  void OnWriteFinished(WriteReq *req, int status) {
-    free(req->buf()->base);
-    delete req;
-  }
+  void OnWriteFinished(WriteReq *req, int status) { delete req; }
 
   // C-style function adapters for libuv
 
@@ -114,7 +116,7 @@ class Connection final {
 
 class Server {
  public:
-  Server() {
+  Server(uv_loop_t *const loop) : loop_(loop) {
     uv_tcp_init(loop_, &socket_);
     uv_ip4_addr("0.0.0.0", DEFAULT_PORT, &addr_);
     uv_tcp_bind(&socket_, (const struct sockaddr *)&addr_, 0);
@@ -147,12 +149,12 @@ class Server {
 
  private:
   uv_tcp_t socket_;
-  uv_loop_t *const loop_{uv_default_loop()};
+  uv_loop_t *const loop_;
   struct sockaddr_in addr_;
 };
 
 int main() {
-  Server s;
+  Server s{uv_default_loop()};
   s.Start();
   std::cout << uv_strerror(uv_loop_close(uv_default_loop())) << std::endl;
 }
