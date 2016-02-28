@@ -13,12 +13,17 @@ const size_t LENGTH_SIZE = 4;
 struct Array {
   Array(uint8_t* const buf, size_t original_size, size_t start = 0)
       : buf_(buf), original_size_(original_size), start_(start) {
-    assert(start_ < original_size_);
+    if (start_ >= original_size_) {
+      throw std::invalid_argument(
+          "Invalid start argument, must be less than original_size.");
+    }
   }
 
+  // Deletes the underlying buffer
   void Delete() { delete[] buf_; }
 
-  uint8_t* start() const { return buf_ + start_; }
+  const uint8_t* start() const { return buf_ + start_; }
+
   void add_start(size_t start) {
     start_ += start;
     assert(size() >= 0);
@@ -40,13 +45,30 @@ struct Array {
   }
 
  private:
+  // buf points to the original beginning of the array
   uint8_t* buf_;
+
+  // the size of the original buffer
   size_t original_size_;
+
+  // the offset where users should read from within the buffer
   size_t start_;
+
+  // indicates if this array is valid,
+  // it is not valid if there is nothing else to read
   bool valid_ = true;
 };
 
-// This class is not thread safe
+// Parser provides a convenient interface for reading messages that are prefixed
+// with their length in bytes.
+//
+// Example:
+//
+//   Parser p;
+//   p.Sink(...);
+//   while (p.HasNext()){
+//     auto msg = p.GetNext();
+//   }
 //
 class Parser {
  public:
