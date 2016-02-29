@@ -48,8 +48,8 @@ class Conn final {
   }
 
   void AllocBuffer(size_t suggested_size, uv_buf_t *buf) {
-    buf->base = new char[suggested_size];
-    buf->len = suggested_size;
+    buf->base = new char[2000];
+    buf->len = 2000;
   }
 
   void OnRead(ssize_t nread, const uv_buf_t *buf) {
@@ -59,9 +59,7 @@ class Conn final {
       }
       Close();
     } else if (nread > 0) {
-      count_ += nread;
-      printf("Read: %d\n", count_);
-
+      // TODO if nread is << buf->len, we are wasting a lot of space in parser
       parser_.Sink((uint8_t *)buf->base, nread);
       while (parser_.HasNext()) {
         auto msg = parser_.GetNext();
@@ -82,8 +80,6 @@ class Conn final {
   uv_tcp_t socket_;
 
   Parser parser_;
-
-  int count_{0};
 
   // C-style function adapters for libuv
 
