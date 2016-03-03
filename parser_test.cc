@@ -4,7 +4,7 @@
 
 TEST(Parser, Empty) {
   Parser p;
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_FALSE(p.HasMessages());
 }
 
 TEST(Parser, ZeroMsgLength) {
@@ -13,7 +13,7 @@ TEST(Parser, ZeroMsgLength) {
   Parser p;
   p.Sink(buf, 4);
 
-  EXPECT_TRUE(p.HasNext());
+  // Decide what to do in this case
 }
 
 TEST(Parser, Length) {
@@ -22,7 +22,7 @@ TEST(Parser, Length) {
   Parser p;
   p.Sink(buf, 4);
 
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_FALSE(p.HasMessages());
 }
 
 TEST(Parser, LengthChunks) {
@@ -30,18 +30,19 @@ TEST(Parser, LengthChunks) {
 
   p.Sink(new uint8_t{0}, 1);
 
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_FALSE(p.HasMessages());
 
   uint8_t* buf = new uint8_t[2];
   buf[0] = 0;
   buf[1] = 0;
   p.Sink(buf, 2);
 
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_FALSE(p.HasMessages());
 
-  p.Sink(new uint8_t{0}, 1);
+  p.Sink(new uint8_t{1}, 1);
+  p.Sink(new uint8_t{10}, 1);
 
-  EXPECT_TRUE(p.HasNext());
+  EXPECT_TRUE(p.HasMessages());
 }
 
 TEST(Parser, Message) {
@@ -50,10 +51,13 @@ TEST(Parser, Message) {
   Parser p;
   p.Sink(buf, 6);
 
-  EXPECT_TRUE(p.HasNext());
+  EXPECT_TRUE(p.HasMessages());
 
   auto msg = std::vector<uint8_t>{1, 6};
-  EXPECT_EQ(msg, p.GetNext());
+  auto messages = p.GetMessages();
+
+  EXPECT_EQ(msg, *messages[0]);
+  EXPECT_FALSE(p.HasMessages());
 }
 
 TEST(Parser, TwoMessages) {
@@ -67,16 +71,16 @@ TEST(Parser, TwoMessages) {
   Parser p;
   p.Sink(buf, 15);
 
-  EXPECT_TRUE(p.HasNext());
+  EXPECT_TRUE(p.HasMessages());
 
   auto msg = std::vector<uint8_t>{5, 3, 10};
-  EXPECT_EQ(msg, p.GetNext());
+  auto msg2 = std::vector<uint8_t>{1, 2, 3, 4};
 
-  EXPECT_TRUE(p.HasNext());
-  msg = std::vector<uint8_t>{1, 2, 3, 4};
-  EXPECT_EQ(msg, p.GetNext());
+  auto messages = p.GetMessages();
 
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_EQ(2, messages.size());
+  EXPECT_EQ(msg, *messages[0]);
+  EXPECT_EQ(msg2, *messages[1]);
 }
 
 TEST(Parser, Split) {
@@ -91,21 +95,24 @@ TEST(Parser, Split) {
   p.Sink(buf2, 4);
 
   auto msg1 = std::vector<uint8_t>{11, 10};
-  EXPECT_TRUE(p.HasNext());
-  EXPECT_EQ(msg1, p.GetNext());
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_TRUE(p.HasMessages());
+  auto messages = p.GetMessages();
+  EXPECT_EQ(1, messages.size());
+  EXPECT_EQ(msg1, *messages[0]);
+  EXPECT_FALSE(p.HasMessages());
 
   p.Sink(buf3, 1);
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_FALSE(p.HasMessages());
 
   p.Sink(buf4, 5);
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_FALSE(p.HasMessages());
 
   p.Sink(buf5, 3);
   auto msg2 = std::vector<uint8_t>{1, 2, 3, 4};
-  EXPECT_TRUE(p.HasNext());
-  EXPECT_EQ(msg2, p.GetNext());
-  EXPECT_FALSE(p.HasNext());
+  EXPECT_TRUE(p.HasMessages());
+  messages = p.GetMessages();
+  EXPECT_EQ(msg2, *messages[0]);
+  EXPECT_FALSE(p.HasMessages());
 }
 
 int main(int argc, char** argv) {

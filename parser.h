@@ -4,60 +4,12 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <sstream>
 #include <vector>
 #include <inttypes.h>
 
 const size_t LENGTH_SIZE = 4;
-
-struct Array {
-  Array(uint8_t* const buf, size_t original_size, size_t start = 0)
-      : buf_(buf), original_size_(original_size), start_(start) {
-    if (start_ >= original_size_) {
-      throw std::invalid_argument(
-          "Invalid start argument, must be less than original_size.");
-    }
-  }
-
-  // Deletes the underlying buffer
-  void Delete() { delete[] buf_; }
-
-  const uint8_t* start() const { return buf_ + start_; }
-
-  void add_start(size_t start) {
-    start_ += start;
-    assert(size() >= 0);
-    if (start_ == original_size_) {
-      valid_ = false;
-    }
-  }
-
-  size_t size() const { return original_size_ - start_; }
-
-  bool valid() const { return valid_; }
-
-  std::string to_string() const {
-    std::stringstream repr;
-    repr << "buf: " << buf_ << std::endl;
-    repr << "original size: " << original_size_ << std::endl;
-    repr << "start: " << start_ << std::endl;
-    return repr.str();
-  }
-
- private:
-  // buf points to the original beginning of the array
-  uint8_t* buf_;
-
-  // the size of the original buffer
-  size_t original_size_;
-
-  // the offset where users should read from within the buffer
-  size_t start_;
-
-  // indicates if this array is valid,
-  // it is not valid if there is nothing else to read
-  bool valid_ = true;
-};
 
 // Parser provides a convenient interface for reading messages that are prefixed
 // with their length in bytes.
@@ -66,121 +18,96 @@ struct Array {
 //
 //   Parser p;
 //   p.Sink(...);
-//   while (p.HasNext()){
-//     auto msg = p.GetNext();
+//   if (p.HasMessages()) {
+//     auto messages = p.GetMessages();
+//     for (auto msg : messages){
+//       ...
+//     }
 //   }
 //
 class Parser {
  private:
   enum class State { HEADER, BODY };
 
+  typedef std::vector<uint8_t> Message;
+
  public:
-  ~Parser() {
-    for (auto& b : buffers_) {
-      b.Delete();
-    }
+  size_t Fill(uint8_t* dest, size_t dest_size, uint8_t* buf, size_t buf_size) {
+    auto read = std::min(buf_size, dest_size);
+    assert(read >= 0);
+    std::memcpy(dest, buf, read);
+    return read;
   }
 
-  // Sink takes ownership of buf
-  void Sink(uint8_t* const buf, const size_t size) { AddBuffer({buf, size}); }
+  // Sink parses and processes the given buffer, it does not take ownership of
+  // the buffer
+  void Sink(uint8_t* const buf, const size_t size) {
+    size_t buf_end = 0;
 
-  // Returns true if there is a message that can be extracted
-  bool HasNext() {
-    if (state_ == State::HEADER) {
-      if (!TryParseLength()) {
-        return false;
+    while (buf_end < size) {
+      if (state_ == State::HEADER) {
+        auto read = Fill(length_buf_.data() + length_buf_end_,
+                         length_buf_.size() - length_buf_end_, buf + buf_end,
+                         size - buf_end);
+        length_buf_end_ += read;
+        buf_end += read;
+
+        if (length_buf_end_ == LENGTH_SIZE) {
+          msg_buf_.reset(new std::vector<uint8_t>(ParseSize()));
+          printf("msg size %lu\n", msg_buf_->size());
+          length_buf_end_ = 0;
+          msg_buf_end_ = 0;
+          state_ = State::BODY;
+        }
+      } else if (state_ == State::BODY) {
+        auto read = Fill(msg_buf_->data() + msg_buf_end_,
+                         msg_buf_->size() - msg_buf_end_, buf + buf_end,
+                         size - buf_end);
+        msg_buf_end_ += read;
+        buf_end += read;
+
+        if (msg_buf_end_ == msg_buf_->size()) {
+          messages_.push_back(std::move(msg_buf_));
+          state_ = State::HEADER;
+        }
       }
     }
-    return next_msg_length_ <= buffers_total_length_;
+    assert(buf_end == size);
   }
 
-  // Returns the next available message.
-  // It should only be called if HasNext returns true.
-  std::vector<uint8_t> GetNext() {
-    assert(state_ == State::BODY && HasNext() == true);
+  // Returns true if there are any messages to return
+  bool HasMessages() const { return messages_.size() > 0; }
 
-    auto msg = ExtractBytes(next_msg_length_);
-    state_ = State::HEADER;
-    return std::move(msg);
+  // Returns the next available message.
+  // It should only be called if HasMessages returns true.
+  std::vector<std::unique_ptr<Message>> GetMessages() {
+    assert(HasMessages() == true);
+
+    auto out = std::move(messages_);
+    messages_.clear();
+    return std::move(out);
   }
 
  private:
-  // Extracts and returns n bytes from buffers.
-  // It also deletes all buffers that are empty.
-  std::vector<uint8_t> ExtractBytes(size_t n) {
-    assert(n <= buffers_total_length_);
+  // Converts length_buf to size_t
+  size_t ParseSize() {
+    assert(length_buf_end_ == LENGTH_SIZE);
 
-    std::vector<uint8_t> bytes(n);
-    size_t bytes_end = 0;
-
-    for (auto& buf : buffers_) {
-      assert(buf.valid() == true);
-
-      auto read = std::min(buf.size(), n - bytes_end);
-      std::memcpy(bytes.data() + bytes_end, buf.start(), read);
-      bytes_end += read;
-      buf.add_start(read);
-      buffers_total_length_ -= read;
-      if (bytes_end == n) {
-        break;
-      }
-    }
-
-    assert(bytes_end == n);
-    FreeBuffers();
-
-    return bytes;
-  }
-
-  bool TryParseLength() {
-    if (LENGTH_SIZE > buffers_total_length_) {
-      return false;
-    }
-
-    auto bytes = ExtractBytes(LENGTH_SIZE);
-    next_msg_length_ = ParseSize(bytes.data());
-    state_ = State::BODY;
-    return true;
-  }
-
-  // Deletes and frees all buffers that are no longer usable
-  void FreeBuffers() {
-    int valid_buf_index = 0;
-    for (int i = 0; i < buffers_.size(); ++i) {
-      if (!buffers_[i].valid()) {
-        valid_buf_index = i + 1;
-        buffers_[i].Delete();
-      } else {
-        valid_buf_index = i;
-        break;
-      }
-    }
-
-    buffers_.erase(buffers_.begin(), buffers_.begin() + valid_buf_index);
-  }
-
-  // Converts byte array to size_t
-  size_t ParseSize(uint8_t* header) {
     size_t size = 0;
     for (int i = 0; i < LENGTH_SIZE; ++i) {
-      size += (header[i] << (8 * (LENGTH_SIZE - i - 1)));
+      size += (length_buf_[i] << (8 * (LENGTH_SIZE - i - 1)));
     }
     return size;
-  }
-
-  void AddBuffer(Array a) {
-    buffers_total_length_ += a.size();
-    buffers_.push_back(a);
   }
 
  private:
   State state_ = State::HEADER;
 
-  std::vector<Array> buffers_;
+  std::array<uint8_t, LENGTH_SIZE> length_buf_;
+  size_t length_buf_end_ = 0;
 
-  // Indicates the total length of all the arrays in buffers_
-  size_t buffers_total_length_ = 0;
+  std::unique_ptr<std::vector<uint8_t>> msg_buf_;
+  size_t msg_buf_end_ = 0;
 
-  // Size of the next message in bytes
-  size_t next_msg_length_;
+  std::vector<std::unique_ptr<Message>> messages_;
 };
