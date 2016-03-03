@@ -54,7 +54,6 @@ class Parser {
 
         if (length_buf_end_ == LENGTH_SIZE) {
           msg_buf_.reset(new std::vector<uint8_t>(ParseSize()));
-          printf("msg size %lu\n", msg_buf_->size());
           length_buf_end_ = 0;
           msg_buf_end_ = 0;
           state_ = State::BODY;
@@ -80,7 +79,7 @@ class Parser {
 
   // Returns the next available message.
   // It should only be called if HasMessages returns true.
-  std::vector<std::unique_ptr<Message>> GetMessages() {
+  std::vector<std::shared_ptr<Message>> GetMessages() {
     assert(HasMessages() == true);
 
     auto out = std::move(messages_);
@@ -106,8 +105,8 @@ class Parser {
   std::array<uint8_t, LENGTH_SIZE> length_buf_;
   size_t length_buf_end_ = 0;
 
-  std::unique_ptr<std::vector<uint8_t>> msg_buf_;
+  std::shared_ptr<std::vector<uint8_t>> msg_buf_;
   size_t msg_buf_end_ = 0;
 
-  std::vector<std::unique_ptr<Message>> messages_;
+  std::vector<std::shared_ptr<Message>> messages_;
 };

@@ -10,25 +10,30 @@
 
 class Conn;
 
-class WriteReq {
- public:
-  WriteReq(Conn *const conn, uv_buf_t buf) : conn_(conn), buf_(std::move(buf)) {
-    assert((void *)this == &req_);
-  }
-
-  ~WriteReq() { free(buf_.base); }
-
-  Conn *conn() { return conn_; }
-  uv_buf_t *buf() { return &buf_; }
-  uv_write_t *req() { return &req_; }
-
- private:
-  uv_write_t req_;
-  Conn *const conn_;
-  uv_buf_t buf_;
-};
-
 class Conn final {
+ private:
+  class WriteReq {
+   public:
+    WriteReq(Conn *const conn, std::shared_ptr<std::vector<uint8_t>> msg)
+        : conn_(conn), msg_(std::move(msg)) {
+      assert((void *)this == &req_);
+      buf_.base = reinterpret_cast<char *>(msg_->data());
+      buf_.len = msg_->size();
+    }
+
+    Conn *conn() { return conn_; }
+
+    uv_buf_t *buf() { return &buf_; }
+
+    uv_write_t *req() { return &req_; }
+
+   private:
+    uv_write_t req_;
+    Conn *const conn_;
+    std::shared_ptr<std::vector<uint8_t>> msg_;
+    uv_buf_t buf_;
+  };
+
  public:
   Conn(uv_loop_t *const loop) {
     assert((void *)&socket_ == (void *)this);
@@ -48,8 +53,8 @@ class Conn final {
   }
 
   void AllocBuffer(size_t suggested_size, uv_buf_t *buf) {
-    buf->base = new char[2000];
-    buf->len = 2000;
+    buf->base = reinterpret_cast<char *>(buffer_.data());
+    buf->len = buffer_.size();
   }
 
   void OnRead(ssize_t nread, const uv_buf_t *buf) {
@@ -59,12 +64,14 @@ class Conn final {
       }
       Close();
     } else if (nread > 0) {
-      // TODO if nread is << buf->len, we are wasting a lot of space in parser
+      printf("Read\n");
       parser_.Sink((uint8_t *)buf->base, nread);
-      while (parser_.HasNext()) {
-        auto msg = parser_.GetNext();
-        std::string msg_str{(char *)msg.data(), msg.size()};
-        printf("%s\n", msg_str.c_str());
+      if (parser_.HasMessages()) {
+        auto messages = parser_.GetMessages();
+        for (auto &msg : messages) {
+          auto req = new WriteReq(this, msg);
+          uv_write(req->req(), stream(), req->buf(), 1, OnWriteFinished);
+        }
       }
     }
   }
@@ -80,6 +87,8 @@ class Conn final {
   uv_tcp_t socket_;
 
   Parser parser_;
+
+  std::array<uint8_t, 20000> buffer_;
 
   // C-style function adapters for libuv
 
