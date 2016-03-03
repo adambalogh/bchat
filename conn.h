@@ -8,30 +8,42 @@
 
 #include "parser.h"
 
-class Conn;
-
-class Conn final {
+class Conn {
  private:
   class WriteReq {
    public:
     WriteReq(Conn *const conn, std::shared_ptr<std::vector<uint8_t>> msg)
         : conn_(conn), msg_(std::move(msg)) {
       assert((void *)this == &req_);
-      buf_.base = reinterpret_cast<char *>(msg_->data());
-      buf_.len = msg_->size();
+
+      const auto size = msg_->size();
+      length_[0] = (size >> 24) & 0xFF;
+      length_[1] = (size >> 16) & 0xFF;
+      length_[2] = (size >> 8) & 0xFF;
+      length_[3] = size & 0xFF;
+
+      buf_[0].base = reinterpret_cast<char *>(length_.data());
+      buf_[0].len = length_.size();
+
+      buf_[1].base = reinterpret_cast<char *>(msg_->data());
+      buf_[1].len = msg_->size();
     }
 
     Conn *conn() { return conn_; }
-
-    uv_buf_t *buf() { return &buf_; }
-
+    uv_buf_t *bufs() { return buf_; }
+    size_t buf_count() const { return 2; }
     uv_write_t *req() { return &req_; }
 
    private:
     uv_write_t req_;
+
     Conn *const conn_;
-    std::shared_ptr<std::vector<uint8_t>> msg_;
-    uv_buf_t buf_;
+
+    const std::shared_ptr<std::vector<uint8_t>> msg_;
+
+    std::array<uint8_t, 4> length_;
+
+    uv_buf_t buf_[2];
   };
 
  public:
@@ -64,16 +76,20 @@ class Conn final {
       }
       Close();
     } else if (nread > 0) {
-      printf("Read\n");
       parser_.Sink((uint8_t *)buf->base, nread);
       if (parser_.HasMessages()) {
         auto messages = parser_.GetMessages();
         for (auto &msg : messages) {
-          auto req = new WriteReq(this, msg);
-          uv_write(req->req(), stream(), req->buf(), 1, OnWriteFinished);
+          Send(msg);
         }
       }
     }
+  }
+
+  void Send(const std::shared_ptr<std::vector<uint8_t>> &msg) {
+    auto req = new WriteReq(this, msg);
+    uv_write(req->req(), stream(), req->bufs(), req->buf_count(),
+             OnWriteFinished);
   }
 
   void OnWriteFinished(WriteReq *req, int status) { delete req; }
