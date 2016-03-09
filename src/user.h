@@ -48,4 +48,6 @@ class User {
   Conn& conn_;
 
   UserRepo& user_repo_;
+
+  static int count;
 };

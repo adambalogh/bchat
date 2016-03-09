@@ -13,13 +13,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ")
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 
-add_executable(main user.cc main.cc conn.cc proto/message.pb.cc)
+add_executable(main src/user.cc src/main.cc src/conn.cc src/proto/message.pb.cc)
 target_link_libraries(main uv protobuf hiredis)
 
-add_executable(parser_test parser_test.cc)
+add_executable(parser_test src/parser_test.cc)
 target_link_libraries(parser_test gtest)
 
-add_executable(benchmark_main benchmark.cc)
+add_executable(benchmark_main src/benchmark.cc)
 set_target_properties(benchmark_main 
   PROPERTIES COMPILE_FLAGS "-O3 -DNDEBUG")
 target_link_libraries(benchmark_main benchmark)

@@ -2,8 +2,10 @@
 
 #include "conn.h"
 
+int User::count = 0;
+
 User::User(Conn& conn, UserRepo& user_repo)
-    : name_(std::to_string(std::rand())), conn_(conn), user_repo_(user_repo) {
+    : name_(std::to_string(count++)), conn_(conn), user_repo_(user_repo) {
   user_repo_.RegisterUser(name_, this);
 }
 
