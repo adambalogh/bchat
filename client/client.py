@@ -15,15 +15,24 @@ def encode(msg):
     array = [chr(x) for x in array]
     return (''.join(array) + msg)
 
-def send(content, to):
+def register(s, name):
+    auth = message_pb2.Authentication()
+    auth.name = name
+    s.send(encode(auth.SerializeToString()))
+
+def send(s, content, to):
     msg = message_pb2.Message()
     msg.content = content
     msg.recipient = to
-
     s.send(encode(msg.SerializeToString()))
 
+def get_socket():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('127.0.0.1', PORT))
+    return s
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('127.0.0.1', PORT))
 
-send('hello', '0')
+s = get_socket()
+
+register(s, 'Adam')
+send(s, 'hello', 'Adam')

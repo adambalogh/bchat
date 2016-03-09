@@ -2,22 +2,36 @@
 
 #include "conn.h"
 
-int User::count = 0;
-
 User::User(Conn& conn, UserRepo& user_repo)
-    : name_(std::to_string(count++)), conn_(conn), user_repo_(user_repo) {
-  user_repo_.RegisterUser(name_, this);
-}
+    : conn_(conn), user_repo_(user_repo) {}
 
-void User::OnMessage(Conn::MessagePtr bin) {
+void User::OnMessage(MessagePtr bin) {
+  if (!authenticated_) {
+    Authenticate(std::move(bin));
+    return;
+  }
+
   proto::Message message;
   auto rc = message.ParseFromArray(bin->data(), bin->size());
   assert(rc == true);
 
-  auto recipient = user_repo_.GetUser(message.recipient());
+  auto recipient = user_repo_.Get(message.recipient());
   message.set_sender(name_);
-
   recipient.SendMessage(message);
+}
+
+void User::Authenticate(MessagePtr msg) {
+  proto::Authentication auth;
+  if (!auth.ParseFromArray(msg->data(), msg->size())) {
+    // error
+    return;
+  }
+  if (!user_repo_.Register(auth.name(), this)) {
+    // error
+    return;
+  }
+  name_ = auth.name();
+  authenticated_ = true;
 }
 
 void User::SendMessage(proto::Message msg) {
@@ -26,4 +40,4 @@ void User::SendMessage(proto::Message msg) {
   conn_.Send(std::move(bin));
 }
 
-void User::OnDisconnect() { user_repo_.RemoveUser(name_); }
+void User::OnDisconnect() { user_repo_.Remove(name_); }

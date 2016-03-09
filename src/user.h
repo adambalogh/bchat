@@ -10,14 +10,23 @@ class Conn;
 
 class UserRepo {
  public:
-  void RegisterUser(const std::string& name, User* user) {
+  bool Register(const std::string& name, User* user) {
     assert(user != nullptr);
+    if (Contains(name)) {
+      return false;
+    }
+
     users_[name] = user;
+    return true;
   }
 
-  User& GetUser(const std::string& name) { return *users_.at(name); }
+  User& Get(const std::string& name) { return *users_.at(name); }
 
-  void RemoveUser(const std::string& name) {
+  bool Contains(const std::string& name) const {
+    return users_.count(name) == 1;
+  }
+
+  void Remove(const std::string& name) {
     auto user = users_.find(name);
     if (user != users_.end()) {
       users_.erase(user);
@@ -34,20 +43,24 @@ class UserRepo {
 //
 class User {
  public:
+  typedef std::unique_ptr<std::vector<uint8_t>> MessagePtr;
+
   User(Conn& conn, UserRepo& user_repo);
 
-  void OnMessage(std::unique_ptr<std::vector<uint8_t>> msg);
+  void OnMessage(MessagePtr msg);
+
+  void Authenticate(MessagePtr msg);
 
   void SendMessage(proto::Message msg);
 
   void OnDisconnect();
 
  private:
-  const std::string name_;
-
   Conn& conn_;
 
-  UserRepo& user_repo_;
+  bool authenticated_ = false;
 
-  static int count;
+  std::string name_;
+
+  UserRepo& user_repo_;
 };

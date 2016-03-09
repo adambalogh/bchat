@@ -19,7 +19,7 @@ target_link_libraries(main uv protobuf hiredis)
 add_executable(parser_test src/parser_test.cc)
 target_link_libraries(parser_test gtest)
 
-add_executable(benchmark_main src/benchmark.cc)
-set_target_properties(benchmark_main 
+add_executable(parser_benchmark src/parser_benchmark.cc)
+set_target_properties(parser_benchmark 
   PROPERTIES COMPILE_FLAGS "-O3 -DNDEBUG")
-target_link_libraries(benchmark_main benchmark)
+target_link_libraries(parser_benchmark benchmark)

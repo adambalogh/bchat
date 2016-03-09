@@ -2,6 +2,11 @@ syntax = "proto2";
 
 package proto;
 
+message Authentication {
+  // TODO real authentication
+  required string name = 1;
+}
+
 message Message{
   optional string sender = 1;
 
