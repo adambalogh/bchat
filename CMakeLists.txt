@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.2)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -13,8 +13,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ")
 include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 
-add_executable(main libuv.cc)
-target_link_libraries(main uv)
+add_executable(main user.cc main.cc conn.cc proto/message.pb.cc)
+target_link_libraries(main uv protobuf hiredis)
 
 add_executable(parser_test parser_test.cc)
 target_link_libraries(parser_test gtest)
+
+add_executable(benchmark_main benchmark.cc)
+set_target_properties(benchmark_main 
+  PROPERTIES COMPILE_FLAGS "-O3 -DNDEBUG")
+target_link_libraries(benchmark_main benchmark)

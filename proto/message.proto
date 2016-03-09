@@ -1,9 +1,11 @@
 syntax = "proto2";
 
-message Message{
-  required string sender = 1;
+package proto;
 
-  required string recipient = 2;
+message Message{
+  optional string sender = 1;
+
+  optional string recipient = 2;
 
   required string content = 3;
 }

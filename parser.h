@@ -29,11 +29,13 @@ class Parser {
  private:
   enum class State { HEADER, BODY };
 
-  typedef std::vector<uint8_t> Message;
-
  public:
-  size_t Fill(uint8_t* dest, size_t dest_size, uint8_t* buf, size_t buf_size) {
-    auto read = std::min(buf_size, dest_size);
+  typedef std::vector<uint8_t> Message;
+  typedef std::unique_ptr<Message> MessagePtr;
+
+  size_t Fill(uint8_t* const dest, const size_t dest_size,
+              const uint8_t* const buf, const size_t buf_size) {
+    const auto read = std::min(buf_size, dest_size);
     assert(read >= 0);
     std::memcpy(dest, buf, read);
     return read;
@@ -46,9 +48,9 @@ class Parser {
 
     while (buf_end < size) {
       if (state_ == State::HEADER) {
-        auto read = Fill(length_buf_.data() + length_buf_end_,
-                         length_buf_.size() - length_buf_end_, buf + buf_end,
-                         size - buf_end);
+        const auto read = Fill(length_buf_.data() + length_buf_end_,
+                               length_buf_.size() - length_buf_end_,
+                               buf + buf_end, size - buf_end);
         length_buf_end_ += read;
         buf_end += read;
 
@@ -59,9 +61,9 @@ class Parser {
           state_ = State::BODY;
         }
       } else if (state_ == State::BODY) {
-        auto read = Fill(msg_buf_->data() + msg_buf_end_,
-                         msg_buf_->size() - msg_buf_end_, buf + buf_end,
-                         size - buf_end);
+        const auto read = Fill(msg_buf_->data() + msg_buf_end_,
+                               msg_buf_->size() - msg_buf_end_, buf + buf_end,
+                               size - buf_end);
         msg_buf_end_ += read;
         buf_end += read;
 
@@ -79,7 +81,7 @@ class Parser {
 
   // Returns the next available message.
   // It should only be called if HasMessages returns true.
-  std::vector<std::shared_ptr<Message>> GetMessages() {
+  std::vector<MessagePtr> GetMessages() {
     assert(HasMessages() == true);
 
     auto out = std::move(messages_);
@@ -105,8 +107,8 @@ class Parser {
   std::array<uint8_t, LENGTH_SIZE> length_buf_;
   size_t length_buf_end_ = 0;
 
-  std::shared_ptr<std::vector<uint8_t>> msg_buf_;
+  MessagePtr msg_buf_;
   size_t msg_buf_end_ = 0;
 
-  std::vector<std::shared_ptr<Message>> messages_;
+  std::vector<MessagePtr> messages_;
 };
