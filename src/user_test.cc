@@ -92,6 +92,31 @@ TEST(User, UsernameTaken) {
   u2.OnMessage(MakeMsg(req.SerializeAsString()));
 }
 
+TEST(User, DiscconnectsUser) {
+  UserRepo repo;
+
+  proto::Request req;
+  req.set_type(req.Authentication);
+  req.mutable_authentication()->set_name("Adam");
+
+  // Register 1st User
+  MockConn conn;
+  User u{conn, repo};
+  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  u.OnDisconnect();
+
+  // Register 2nd user with same name
+  MockConn conn2;
+  User u2{conn2, repo};
+
+  EXPECT_CALL(conn2, SendProxy(_)).Times(0);
+
+  req.Clear();
+  req.set_type(req.Authentication);
+  req.mutable_authentication()->set_name("Adam");
+  u2.OnMessage(MakeMsg(req.SerializeAsString()));
+}
+
 TEST(User, MessageSend) {
   MockConn conn;
   UserRepo repo;
