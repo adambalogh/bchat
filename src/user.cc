@@ -16,10 +16,11 @@ void User::OnMessage(MessagePtr bin) {
 
   if (!authenticated_) {
     if (req.type() == req.Authentication) {
-      Authenticate(std::move(bin));
+      assert(req.has_authentication() == true);
+      Authenticate(req.authentication());
       return;
     } else {
-      SendErrorMsg("You are not authenticated");
+      SendErrorMsg("You must authenticate yourself first");
       return;
     }
   } else if (req.type() == req.Authentication) {
@@ -31,23 +32,17 @@ void User::OnMessage(MessagePtr bin) {
   assert(req.type() != req.Authentication);
 
   if (req.type() == req.Message) {
-    proto::Message message;
-    auto rc = message.ParseFromArray(bin->data(), bin->size());
-    assert(rc == true);
-    auto recipient = user_repo_.Get(message.recipient());
-    message.set_sender(name_);
-    recipient.SendMessage(message);
-  } else if (req.type() == req.MessagesList) {
+    assert(req.has_message() == true);
+    proto::Message msg = req.message();
+    auto recipient = user_repo_.Get(msg.recipient());
+    msg.set_sender(name_);
+    recipient.SendMessage(std::move(msg));
+  } else if (req.type() == req.MessagesListReq) {
     // return messages
   }
 }
 
-void User::Authenticate(MessagePtr msg) {
-  proto::Authentication auth;
-  if (!auth.ParseFromArray(msg->data(), msg->size())) {
-    SendErrorMsg("Invalid authentication");
-    return;
-  }
+void User::Authenticate(const proto::Authentication& auth) {
   if (user_repo_.Contains(auth.name())) {
     SendErrorMsg("Username already taken");
     return;
@@ -60,22 +55,22 @@ void User::Authenticate(MessagePtr msg) {
 }
 
 void User::SendErrorMsg(const std::string& error_msg) {
-  proto::Request req;
-  req.set_type(req.Error);
-  req.set_body(error_msg);
-
-  auto bin = std::make_unique<Conn::Message>(req.ByteSize());
-  req.SerializeToArray(bin->data(), bin->size());
-  conn_.Send(std::move(bin));
+  proto::Response res;
+  res.set_type(res.Error);
+  res.mutable_error()->set_message(error_msg);
+  SendResponse(res);
 }
 
 void User::SendMessage(proto::Message msg) {
-  proto::Request req;
-  req.set_type(req.Message);
-  req.set_body(std::move(msg.SerializeAsString()));
+  proto::Response res;
+  res.set_type(res.Message);
+  res.set_allocated_message(&msg);
+  SendResponse(res);
+}
 
-  auto bin = std::make_unique<Conn::Message>(req.ByteSize());
-  req.SerializeToArray(bin->data(), bin->size());
+void User::SendResponse(const proto::Response& res) {
+  auto bin = std::make_unique<Conn::Message>(res.ByteSize());
+  res.SerializeToArray(bin->data(), bin->size());
   conn_.Send(std::move(bin));
 }
 

@@ -54,7 +54,9 @@ class User {
   void OnDisconnect();
 
  private:
-  void Authenticate(MessagePtr msg);
+  void Authenticate(const proto::Authentication& auth);
+
+  void SendResponse(const proto::Response& res);
 
   void SendErrorMsg(const std::string& error_msg);
 

@@ -8,7 +8,6 @@
 
 #include "parser.h"
 #include "user.h"
-#include "proto/message.pb.h"
 
 class Conn {
  public:
