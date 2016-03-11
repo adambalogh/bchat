@@ -9,21 +9,25 @@
 #include <vector>
 #include <inttypes.h>
 
-const size_t LENGTH_SIZE = 4;
+#include "uv.h"
 
-// Parser provides a convenient interface for reading messages that are prefixed
-// with their length in bytes.
+const size_t LENGTH_SIZE = 4;
+const size_t MIN_FREE_SPACE = 1000;
+
+// Parser provides an efficient and convenient way of reading messages
+// that are prefixed with their length in bytes.
 //
-// Example:
+// The layout of the parser's buffer is as follows:
 //
-//   Parser p;
-//   p.Sink(...);
-//   if (p.HasMessages()) {
-//     auto messages = p.GetMessages();
-//     for (auto msg : messages){
-//       ...
-//     }
-//   }
+//
+//   |              buf_size                 |                     |
+//   |                                       |                     |
+//   | buf_parsed_size |    ParsableSize()   |      FreeSpace()    |
+//   |                 |                     |                     |
+//   --------------------------------------------------------------
+//   | already parsed  | has not been parsed | has not been filled |
+//   --------------------------------------------------------------
+//                Parsable()             FreeBuf()
 //
 class Parser {
  private:
@@ -32,71 +36,103 @@ class Parser {
  public:
   typedef std::vector<uint8_t> Message;
   typedef std::unique_ptr<Message> MessagePtr;
+  typedef std::function<void(uv_buf_t)> Handle;
 
-  size_t Fill(uint8_t* const dest, const size_t dest_size,
-              const uint8_t* const buf, const size_t buf_size) {
-    const auto read = std::min(buf_size, dest_size);
-    assert(read >= 0);
-    std::memcpy(dest, buf, read);
-    return read;
+  uv_buf_t GetBuf() {
+    uv_buf_t buf;
+    buf.base = reinterpret_cast<char*>(FreeBuf());
+    buf.len = FreeBufSize();
+    return buf;
   }
 
   // Sink parses and processes the given buffer, it does not take ownership of
   // the buffer
-  void Sink(uint8_t* const buf, const size_t size) {
-    size_t buf_end = 0;
+  void Sink(const size_t size, Handle handle) {
+    assert(buf_size_ + size <= buf_.size());
+    assert(size >= 0);
+    buf_size_ += size;
 
-    while (buf_end < size) {
+    assert(ParsableSize() >= size);
+    assert(buf_size_ + FreeBufSize() == buf_.size());
+    assert(buf_parsed_size_ + ParsableSize() == buf_size_);
+
+    while (ParsableSize() > 0) {
       if (state_ == State::HEADER) {
-        const auto read = Fill(length_buf_.data() + length_buf_end_,
-                               length_buf_.size() - length_buf_end_,
-                               buf + buf_end, size - buf_end);
-        length_buf_end_ += read;
-        buf_end += read;
-
-        if (length_buf_end_ == LENGTH_SIZE) {
-          msg_buf_.reset(new std::vector<uint8_t>(ParseSize()));
-          length_buf_end_ = 0;
-          msg_buf_end_ = 0;
+        if (ParsableSize() < LENGTH_SIZE) {
+          break;
+        } else {
+          next_size_ = DecodeSize(Parsable());
+          Advance(LENGTH_SIZE);
           state_ = State::BODY;
         }
       } else if (state_ == State::BODY) {
-        const auto read = Fill(msg_buf_->data() + msg_buf_end_,
-                               msg_buf_->size() - msg_buf_end_, buf + buf_end,
-                               size - buf_end);
-        msg_buf_end_ += read;
-        buf_end += read;
-
-        if (msg_buf_end_ == msg_buf_->size()) {
-          messages_.push_back(std::move(msg_buf_));
+        // If we have the whole msg in buffer, handle it
+        if (ParsableSize() >= next_size_) {
+          uv_buf_t buf;
+          buf.base = reinterpret_cast<char*>(Parsable());
+          buf.len = next_size_;
+          handle(buf);
+          Advance(next_size_);
           state_ = State::HEADER;
+        } else {
+          // If there is enough free space for the rest of the msg,
+          // break out of the loop and wait for it
+          if (FreeBufSize() >= next_size_) {
+            break;
+          }
+          // If there is not enough space for the next message, even if we
+          // clear the buffer, we need to use create a sufficient buffer for
+          // the next msg, this shouldn't happen very often
+          if (buf_.size() < next_size_) {
+            // make large buf
+            printf("This should not happen\n");
+          }
+          // If the next msg can fit in the buffer, free up the part of the
+          // buffer that has already been parsed
+          else {
+            DeleteUsed();
+            break;
+          }
         }
       }
     }
-    assert(buf_end == size);
-  }
 
-  // Returns true if there are any messages to return
-  bool HasMessages() const { return messages_.size() > 0; }
+    assert(buf_size_ + FreeBufSize() == buf_.size());
+    assert(buf_parsed_size_ + ParsableSize() == buf_size_);
 
-  // Returns the next available message.
-  // It should only be called if HasMessages returns true.
-  std::vector<MessagePtr> GetMessages() {
-    assert(HasMessages() == true);
-
-    auto out = std::move(messages_);
-    messages_.clear();
-    return std::move(out);
+    if (FreeBufSize() < MIN_FREE_SPACE) {
+      DeleteUsed();
+    }
   }
 
  private:
-  // Converts length_buf to size_t
-  size_t ParseSize() {
-    assert(length_buf_end_ == LENGTH_SIZE);
+  void DeleteUsed() {
+    std::copy(Parsable(), FreeBuf(), buf_.begin());
+    buf_size_ = ParsableSize();
+    buf_parsed_size_ = 0;
 
+    assert(Parsable() == buf_.begin());
+    assert(ParsableSize() + FreeBufSize() == buf_.size());
+  }
+
+  void Advance(size_t size) {
+    buf_parsed_size_ += size;
+    assert(buf_parsed_size_ <= buf_size_);
+  }
+
+  uint8_t* Parsable() { return buf_.data() + buf_parsed_size_; }
+  const uint8_t* Parsable() const { return buf_.data() + buf_parsed_size_; }
+  size_t ParsableSize() const { return buf_size_ - buf_parsed_size_; }
+
+  uint8_t* FreeBuf() { return buf_.data() + buf_size_; }
+  const uint8_t* FreeBuf() const { return buf_.data() + buf_size_; }
+  size_t FreeBufSize() const { return buf_.size() - buf_size_; }
+
+  // Converts length_buf to size_t
+  size_t DecodeSize(const uint8_t* buf) {
     size_t size = 0;
     for (int i = 0; i < LENGTH_SIZE; ++i) {
-      size += (length_buf_[i] << (8 * (LENGTH_SIZE - i - 1)));
+      size += (buf[i] << (8 * (LENGTH_SIZE - i - 1)));
     }
     return size;
   }
@@ -104,11 +140,12 @@ class Parser {
  private:
   State state_ = State::HEADER;
 
-  std::array<uint8_t, LENGTH_SIZE> length_buf_;
-  size_t length_buf_end_ = 0;
+  // We assume that the majority of the messages will be shorter than 10KB, so
+  // they all fit in this buffer, in case they do not ...
+  std::array<uint8_t, 10000> buf_;
 
-  MessagePtr msg_buf_;
-  size_t msg_buf_end_ = 0;
+  size_t buf_parsed_size_ = 0;
+  size_t buf_size_ = 0;
 
-  std::vector<MessagePtr> messages_;
+  size_t next_size_ = 0;
 };
