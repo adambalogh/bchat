@@ -5,34 +5,37 @@ import message_pb2
 
 PORT = 7002
 
-def encode(msg):
-    size = len(msg)
-    array = [0 for i in range(4)]
-    array[0] = (size>>24) & 0xff
-    array[1] = (size>>16) & 0xff
-    array[2] = (size>>8) & 0xff
-    array[3] = (size & 0xff)
-    array = [chr(x) for x in array]
-    return (''.join(array) + msg)
+class Client(object):
+    def __init__(self, name):
+        self.s = self.get_socket()
+        self.register(name)
 
-def register(s, name):
-    auth = message_pb2.Authentication()
-    auth.name = name
-    s.send(encode(auth.SerializeToString()))
+    def get_socket(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('127.0.0.1', PORT))
+        return s
 
-def send(s, content, to):
-    msg = message_pb2.Message()
-    msg.content = content
-    msg.recipient = to
-    s.send(encode(msg.SerializeToString()))
+    def encode(self, msg):
+        size = len(msg)
+        array = [0 for i in range(4)]
+        array[0] = (size>>24) & 0xff
+        array[1] = (size>>16) & 0xff
+        array[2] = (size>>8) & 0xff
+        array[3] = (size & 0xff)
+        array = [chr(x) for x in array]
+        return (''.join(array) + msg)
 
-def get_socket():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('127.0.0.1', PORT))
-    return s
+    def register(self, name):
+        req = message_pb2.Request()
+        req.type = req.Authentication
+        req.authentication.name = name
+        self.s.send(self.encode(req.SerializeToString()))
+
+    def send(self, content, to):
+        req = message_pb2.Request()
+        req.type = req.Message
+        req.message.content = content
+        req.message.recipient = to
+        self.s.send(self.encode(req.SerializeToString()))
 
 
-s = get_socket()
-
-register(s, 'Adam')
-send(s, 'hello', 'Adam')
