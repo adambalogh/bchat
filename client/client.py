@@ -7,15 +7,16 @@ PORT = 7002
 
 class Client(object):
     def __init__(self, name):
-        self.s = self.get_socket()
-        self.register(name)
+        self.s = self.__get_socket()
+        self.__register(name)
+        self.buf = []
 
-    def get_socket(self):
+    def __get_socket(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(('127.0.0.1', PORT))
         return s
 
-    def encode(self, msg):
+    def __encode(self, msg):
         size = len(msg)
         array = [0 for i in range(4)]
         array[0] = (size>>24) & 0xff
@@ -25,17 +26,46 @@ class Client(object):
         array = [chr(x) for x in array]
         return (''.join(array) + msg)
 
-    def register(self, name):
+    def __decode(self, buf):
+        assert(len(buf) == 4)
+        size = 0
+        buf = [int(x.encode('hex'), 16) for x in buf]
+        size += (buf[0] << 24)
+        size += (buf[1] << 16)
+        size += (buf[2] << 8)
+        size += (buf[3])
+        return size
+
+    def __register(self, name):
         req = message_pb2.Request()
         req.type = req.Authentication
         req.authentication.name = name
-        self.s.send(self.encode(req.SerializeToString()))
+        self.s.send(self.__encode(req.SerializeToString()))
 
-    def send(self, content, to):
+    def send(self, to, content):
         req = message_pb2.Request()
         req.type = req.Message
         req.message.content = content
         req.message.recipient = to
-        self.s.send(self.encode(req.SerializeToString()))
+        self.s.send(self.__encode(req.SerializeToString()))
 
+    def __parse_proto(self, msg):
+        res = message_pb2.Response()
+        res.ParseFromString(''.join(msg))
+        self.__handle_response(res)
+
+    def __handle_response(self, res):
+        if res.type == res.Error:
+            print 'Error', res.error
+        if res.type == res.Message:
+            print 'Message from {}: {}'.format(res.message.sender, res.message.content)
+
+    def recv(self):
+        self.buf.extend(self.s.recv(10000))
+        if len(self.buf) >= 4:
+            size = self.__decode(self.buf[:4])
+            if len(self.buf) - 4 >= size:
+                self.buf = self.buf[4:]
+                self.__parse_proto(self.buf[:size])
+                self.buf = self.buf[size:]
 
