@@ -63,6 +63,35 @@ TEST(User, MustAuthenticateFirst) {
   u.OnMessage(MakeMsg(req.SerializeAsString()));
 }
 
+TEST(User, UsernameTaken) {
+  UserRepo repo;
+
+  // Register 1st User
+  MockConn conn;
+  User u{conn, repo};
+
+  proto::Request req;
+  req.set_type(req.Authentication);
+  req.mutable_authentication()->set_name("Adam");
+  u.OnMessage(MakeMsg(req.SerializeAsString()));
+
+  // Register 2nd user with same name
+  MockConn conn2;
+  User u2{conn2, repo};
+
+  proto::Response res;
+  res.set_type(res.Error);
+  res.mutable_error()->set_type(proto::Error_Type_UsernameTaken);
+  auto bin = MakeMsg(res.SerializeAsString());
+
+  EXPECT_CALL(conn2, SendProxy(Pointee(*bin)));
+
+  req.Clear();
+  req.set_type(req.Authentication);
+  req.mutable_authentication()->set_name("Adam");
+  u2.OnMessage(MakeMsg(req.SerializeAsString()));
+}
+
 TEST(User, MessageSend) {
   MockConn conn;
   UserRepo repo;

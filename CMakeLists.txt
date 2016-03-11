@@ -20,8 +20,7 @@ add_executable(parser_test src/parser_test.cc)
 target_link_libraries(parser_test gtest)
 
 add_executable(user_test src/user_test.cc src/user.cc src/proto/message.pb.cc)
-target_link_libraries(user_test protobuf gtest)
-
+target_link_libraries(user_test protobuf gmock gtest)
 
 add_executable(parser_benchmark src/parser_benchmark.cc)
 set_target_properties(parser_benchmark 
