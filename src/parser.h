@@ -29,6 +29,12 @@ const size_t MIN_FREE_SPACE = 1000;
 //   --------------------------------------------------------------
 //                Parsable()             FreeBuf()
 //
+// Example usage:
+//
+//   Parser p;
+//   auto written = FillBuff(p.GetBuf());
+//   p.Sink(written, ...);
+//
 class Parser {
  private:
   enum class State { HEADER, BODY };
@@ -38,6 +44,9 @@ class Parser {
   typedef std::unique_ptr<Message> MessagePtr;
   typedef std::function<void(uv_buf_t)> Handle;
 
+  // GetBuf returns a buffer that should be filled with the data we want to
+  // parse. The size of the data copied into this buffer must be less than
+  // buf.len.
   uv_buf_t GetBuf() {
     uv_buf_t buf;
     buf.base = reinterpret_cast<char*>(FreeBuf());
@@ -45,16 +54,16 @@ class Parser {
     return buf;
   }
 
-  // Sink parses and processes the given buffer, it does not take ownership of
-  // the buffer
+  // Sink parses and processes the given buffer, and calls handle for each
+  // message that is fully available.
+  //
+  // It does not take ownership of the given buffer.
   void Sink(const size_t size, Handle handle) {
-    assert(buf_size_ + size <= buf_.size());
     assert(size >= 0);
-    buf_size_ += size;
-
+    assert(buf_size_ + size <= buf_.size());
     assert(ParsableSize() >= size);
-    assert(buf_size_ + FreeBufSize() == buf_.size());
-    assert(buf_parsed_size_ + ParsableSize() == buf_size_);
+
+    buf_size_ += size;
 
     while (ParsableSize() > 0) {
       if (state_ == State::HEADER) {
@@ -84,7 +93,7 @@ class Parser {
           // clear the buffer, we need to use create a sufficient buffer for
           // the next msg, this shouldn't happen very often
           if (buf_.size() < next_size_) {
-            // make large buf
+            // TODO handle this case
             printf("This should not happen\n");
           }
           // If the next msg can fit in the buffer, free up the part of the
@@ -96,9 +105,6 @@ class Parser {
         }
       }
     }
-
-    assert(buf_size_ + FreeBufSize() == buf_.size());
-    assert(buf_parsed_size_ + ParsableSize() == buf_size_);
 
     if (FreeBufSize() < MIN_FREE_SPACE) {
       DeleteUsed();
