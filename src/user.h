@@ -49,7 +49,7 @@ class User {
 
   void OnMessage(MessagePtr msg);
 
-  void SendMessage(proto::Message msg);
+  void SendMessage(const proto::Message& msg);
 
   void OnDisconnect();
 

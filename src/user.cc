@@ -61,11 +61,12 @@ void User::SendErrorMsg(const std::string& error_msg) {
   SendResponse(res);
 }
 
-void User::SendMessage(proto::Message msg) {
+void User::SendMessage(const proto::Message& msg) {
   proto::Response res;
   res.set_type(res.Message);
-  res.mutable_message()->Swap(&msg);
+  res.set_allocated_message(const_cast<proto::Message*>(&msg));
   SendResponse(res);
+  res.release_message();
 }
 
 void User::SendResponse(const proto::Response& res) {
