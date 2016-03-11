@@ -49,13 +49,15 @@ class User {
 
   void OnMessage(MessagePtr msg);
 
-  void Authenticate(MessagePtr msg);
-
   void SendMessage(proto::Message msg);
 
   void OnDisconnect();
 
  private:
+  void Authenticate(MessagePtr msg);
+
+  void SendErrorMsg(const std::string& error_msg);
+
   Conn& conn_;
 
   bool authenticated_ = false;

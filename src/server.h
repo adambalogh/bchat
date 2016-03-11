@@ -34,7 +34,7 @@ class Server {
       fprintf(stderr, "New connection error %s\n", uv_strerror(status));
       return;
     }
-    auto *client = new Conn(loop_, users_);
+    auto *client = new ConnImpl(loop_, users_);
     client->Start(reinterpret_cast<uv_stream_t *>(&socket_));
   }
 

@@ -15,26 +15,34 @@ class Conn {
   typedef Parser::Message Message;
   typedef Parser::MessagePtr MessagePtr;
 
+  virtual ~Conn() {}
+
+  virtual void OnRead(ssize_t nread, const uv_buf_t *buf) = 0;
+  virtual void Send(const MessagePtr msg) = 0;
+};
+
+class ConnImpl : public Conn {
  private:
   class WriteReq {
    public:
-    WriteReq(Conn *const conn, MessagePtr msg);
+    WriteReq(ConnImpl *const conn, MessagePtr msg);
 
-    Conn *conn() { return conn_; }
+    ConnImpl *conn() { return conn_; }
     uv_buf_t *bufs() { return buf_; }
     size_t buf_count() const { return 2; }
     uv_write_t *req() { return &req_; }
 
    private:
     uv_write_t req_;
-    Conn *const conn_;
+    ConnImpl *const conn_;
     const MessagePtr msg_;
     std::array<uint8_t, 4> length_;
     uv_buf_t buf_[2];
   };
 
  public:
-  Conn(uv_loop_t *const loop, UserRepo &user_repo) : user_(*this, user_repo) {
+  ConnImpl(uv_loop_t *const loop, UserRepo &user_repo)
+      : user_(*this, user_repo) {
     assert((void *)&socket_ == (void *)this);
     uv_tcp_init(loop, &socket_);
   }
@@ -45,9 +53,9 @@ class Conn {
 
   void AllocBuffer(size_t suggested_size, uv_buf_t *buf);
 
-  void OnRead(ssize_t nread, const uv_buf_t *buf);
+  void OnRead(ssize_t nread, const uv_buf_t *buf) override;
 
-  void Send(const MessagePtr msg);
+  void Send(const MessagePtr msg) override;
 
   void OnWriteFinished(WriteReq *req, int status);
 
@@ -69,17 +77,17 @@ class Conn {
 
  public:
   static inline void Delete(uv_handle_t *h) {
-    delete reinterpret_cast<Conn *>(h);
+    delete reinterpret_cast<ConnImpl *>(h);
   }
 
   static inline void AllocBuffer(uv_handle_t *handle, size_t suggested_size,
                                  uv_buf_t *buf) {
-    reinterpret_cast<Conn *>(handle)->AllocBuffer(suggested_size, buf);
+    reinterpret_cast<ConnImpl *>(handle)->AllocBuffer(suggested_size, buf);
   }
 
   static inline void OnRead(uv_stream_t *client, ssize_t nread,
                             const uv_buf_t *buf) {
-    reinterpret_cast<Conn *>(client)->OnRead(nread, buf);
+    reinterpret_cast<ConnImpl *>(client)->OnRead(nread, buf);
   }
 
   static inline void OnWriteFinished(uv_write_t *uv_req, int status) {

@@ -1,7 +1,7 @@
-#include "conn.h"
+#include "Conn.h"
 
-Conn::WriteReq::WriteReq(Conn *const conn, MessagePtr msg)
-    : conn_(conn), msg_(std::move(msg)) {
+ConnImpl::WriteReq::WriteReq(ConnImpl *const ConnImpl, MessagePtr msg)
+    : conn_(ConnImpl), msg_(std::move(msg)) {
   assert((void *)this == &req_);
 
   const auto size = msg_->size();
@@ -17,12 +17,12 @@ Conn::WriteReq::WriteReq(Conn *const conn, MessagePtr msg)
   buf_[1].len = msg_->size();
 }
 
-void inline Conn::Close() {
+void inline ConnImpl::Close() {
   user_.OnDisconnect();
   uv_close((uv_handle_t *)this, Delete);
 }
 
-void Conn::Start(uv_stream_t *const server) {
+void ConnImpl::Start(uv_stream_t *const server) {
   if (uv_accept(server, (uv_stream_t *)this) == 0) {
     uv_read_start(stream(), AllocBuffer, OnRead);
   } else {
@@ -30,12 +30,12 @@ void Conn::Start(uv_stream_t *const server) {
   }
 }
 
-void Conn::AllocBuffer(size_t suggested_size, uv_buf_t *buf) {
+void ConnImpl::AllocBuffer(size_t suggested_size, uv_buf_t *buf) {
   buf->base = reinterpret_cast<char *>(buffer_.data());
   buf->len = buffer_.size();
 }
 
-void Conn::OnRead(ssize_t nread, const uv_buf_t *buf) {
+void ConnImpl::OnRead(ssize_t nread, const uv_buf_t *buf) {
   if (nread < 0) {
     if (nread != UV_EOF) {
       fprintf(stderr, "Read error %s\n", uv_err_name(nread));
@@ -52,10 +52,10 @@ void Conn::OnRead(ssize_t nread, const uv_buf_t *buf) {
   }
 }
 
-void Conn::Send(MessagePtr msg) {
+void ConnImpl::Send(MessagePtr msg) {
   auto req = new WriteReq(this, std::move(msg));
   uv_write(req->req(), stream(), req->bufs(), req->buf_count(),
            OnWriteFinished);
 }
 
-void Conn::OnWriteFinished(WriteReq *req, int status) { delete req; }
+void ConnImpl::OnWriteFinished(WriteReq *req, int status) { delete req; }

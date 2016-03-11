@@ -2,6 +2,19 @@ syntax = "proto2";
 
 package proto;
 
+message Request {
+  enum Type {
+    Authentication = 0;
+    Message = 1;
+    MessagesList = 2;
+    // Only the server should send errors
+    Error = 3;
+  }
+  required Type type = 1;
+  required bytes body = 2;
+}
+
+
 message Authentication {
   // TODO real authentication
   required string name = 1;
