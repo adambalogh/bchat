@@ -19,10 +19,16 @@ target_link_libraries(main uv protobuf hiredis)
 add_executable(parser_test src/parser_test.cc)
 target_link_libraries(parser_test gtest)
 
-add_executable(user_test src/user_test.cc src/user.cc src/proto/message.pb.cc)
-target_link_libraries(user_test protobuf gmock gtest)
-
 add_executable(parser_benchmark src/parser_benchmark.cc)
 set_target_properties(parser_benchmark 
   PROPERTIES COMPILE_FLAGS "-O3 -DNDEBUG")
 target_link_libraries(parser_benchmark benchmark)
+
+add_executable(user_test src/user_test.cc src/user.cc src/proto/message.pb.cc)
+target_link_libraries(user_test protobuf gmock gtest)
+
+add_executable(user_benchmark src/user.cc src/user_benchmark.cc
+  src/proto/message.pb.cc)
+set_target_properties(user_benchmark 
+  PROPERTIES COMPILE_FLAGS "-O3 -DNDEBUG")
+target_link_libraries(user_benchmark protobuf gmock benchmark)

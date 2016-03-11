@@ -8,76 +8,73 @@ User::User(Conn& conn, UserRepo& user_repo)
     : conn_(conn), user_repo_(user_repo) {}
 
 void User::OnMessage(MessagePtr bin) {
-  proto::Request req;
-  if (!req.ParseFromArray(bin->data(), bin->size())) {
+  req_.Clear();
+  if (!req_.ParseFromArray(bin->data(), bin->size())) {
     SendError(ErrType::Error_Type_InvalidRequest);
     return;
   }
 
   if (!authenticated_) {
-    if (req.type() == req.Authentication) {
-      assert(req.has_authentication() == true);
-      Authenticate(req.authentication());
+    if (req_.type() == req_.Authentication) {
+      assert(req_.has_authentication() == true);
+      Authenticate(req_.authentication());
       return;
     } else {
       SendError(ErrType::Error_Type_MustAuthenticateFirst);
       return;
     }
-  } else if (req.type() == req.Authentication) {
+  } else if (req_.type() == req_.Authentication) {
     SendError(ErrType::Error_Type_AlreadyAuthenticated);
     return;
   }
 
   assert(authenticated_ == true);
-  assert(req.type() != req.Authentication);
+  assert(req_.type() != req_.Authentication);
 
-  if (req.type() == req.Message) {
-    assert(req.has_message() == true);
-
-    proto::Message msg = req.message();
-    if (!user_repo_.Contains(msg.recipient())) {
+  if (req_.type() == req_.Message) {
+    assert(req_.has_message() == true);
+    if (!user_repo_.Contains(req_.message().recipient())) {
       SendError(ErrType::Error_Type_UserNotOnline);
       return;
     }
+
+    proto::Message msg;
+    msg.Swap(req_.mutable_message());
     auto recipient = user_repo_.Get(msg.recipient());
     msg.set_sender(name_);
     recipient.SendMessage(msg);
-  } else if (req.type() == req.MessagesListReq) {
+  } else if (req_.type() == req_.MessagesListReq) {
     // return messages
   }
 }
 
 void User::Authenticate(const proto::Authentication& auth) {
-  if (user_repo_.Contains(auth.name())) {
+  if (!user_repo_.Register(auth.name(), this)) {
     SendError(ErrType::Error_Type_UsernameTaken);
     return;
   }
-
-  auto rc = user_repo_.Register(auth.name(), this);
-  assert(rc == true);
   name_ = auth.name();
   authenticated_ = true;
 }
 
 void User::SendError(ErrType type) {
-  proto::Response res;
-  res.set_type(res.Error);
-  res.mutable_error()->set_type(type);
-  SendResponse(res);
+  res_.set_type(res_.Error);
+  res_.mutable_error()->set_type(type);
+  SendResponse();
 }
 
 void User::SendMessage(const proto::Message& msg) {
-  proto::Response res;
-  res.set_type(res.Message);
-  res.set_allocated_message(const_cast<proto::Message*>(&msg));
-  SendResponse(res);
-  res.release_message();
+  res_.set_type(res_.Message);
+  res_.set_allocated_message(const_cast<proto::Message*>(&msg));
+  SendResponse();
+  res_.release_message();
 }
 
-void User::SendResponse(const proto::Response& res) {
-  auto bin = std::make_unique<Conn::Message>(res.ByteSize());
-  res.SerializeToArray(bin->data(), bin->size());
+void User::SendResponse() {
+  auto bin = std::make_unique<Conn::Message>(res_.ByteSize());
+  res_.SerializeToArray(bin->data(), bin->size());
   conn_.Send(std::move(bin));
+  res_.Clear();
 }
 
 void User::OnDisconnect() { user_repo_.Remove(name_); }

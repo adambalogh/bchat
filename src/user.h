@@ -41,6 +41,8 @@ class UserRepo {
 //
 // Each User is owned by a unique Conn.
 //
+// It is not safe to call from multiple threads.
+//
 class User {
  public:
   typedef std::unique_ptr<std::vector<uint8_t>> MessagePtr;
@@ -53,17 +55,18 @@ class User {
 
   void OnMessage(MessagePtr msg);
 
-  void SendMessage(const proto::Message& msg);
-
   void OnDisconnect();
 
  private:
   void Authenticate(const proto::Authentication& auth);
 
-  void SendResponse(const proto::Response& res);
+  void SendResponse();
 
   void SendError(ErrType);
 
+  void SendMessage(const proto::Message& msg);
+
+ private:
   Conn& conn_;
 
   bool authenticated_ = false;
@@ -71,4 +74,10 @@ class User {
   std::string name_;
 
   UserRepo& user_repo_;
+
+  // Reuse response, for fewer memory allocation
+  proto::Request req_;
+
+  // Reuse response, for fewer memory allocations
+  proto::Response res_;
 };
