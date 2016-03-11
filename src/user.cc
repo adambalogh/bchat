@@ -34,9 +34,9 @@ void User::OnMessage(MessagePtr bin) {
   if (req.type() == req.Message) {
     assert(req.has_message() == true);
     proto::Message msg = req.message();
-    auto recipient = user_repo_.Get(msg.recipient());
     msg.set_sender(name_);
-    recipient.SendMessage(std::move(msg));
+    auto recipient = user_repo_.Get(msg.recipient());
+    recipient.SendMessage(msg);
   } else if (req.type() == req.MessagesListReq) {
     // return messages
   }
@@ -64,7 +64,7 @@ void User::SendErrorMsg(const std::string& error_msg) {
 void User::SendMessage(proto::Message msg) {
   proto::Response res;
   res.set_type(res.Message);
-  res.set_allocated_message(&msg);
+  res.mutable_message()->Swap(&msg);
   SendResponse(res);
 }
 
