@@ -11,8 +11,8 @@
 
 class Conn {
  public:
-  typedef Parser::Message Message;
-  typedef Parser::MessagePtr MessagePtr;
+  typedef std::vector<uint8_t> Message;
+  typedef std::unique_ptr<Message> MessagePtr;
 
   virtual ~Conn() {}
 

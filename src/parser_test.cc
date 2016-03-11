@@ -175,6 +175,19 @@ TEST(Parser, SeveralMsg) {
   }
 }
 
+// TEST(Parser, ExtraLargeMsg) {
+//  Parser p;
+//  MockHandle handle;
+
+//  Arr length{0, 100, 100, 100};
+//  Arr msg(1000);
+
+//  SetBuf(p.GetBuf(), length);
+//  p.Sink(4, HANDLE(handle));
+//  SetBuf(p.GetBuf(), msg);
+//  p.Sink(100, HANDLE(handle));
+//}
+
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

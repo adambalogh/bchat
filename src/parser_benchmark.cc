@@ -9,7 +9,6 @@ static void Sink(benchmark::State& state) {
   Parser p;
 
   Arr length{0, 0, 0, 100};
-
   while (state.KeepRunning()) {
     SetBuf(p.GetBuf(), length);
     p.Sink(4, handle);
