@@ -7,9 +7,9 @@
 User::User(Conn& conn, UserRepo& user_repo)
     : conn_(conn), user_repo_(user_repo) {}
 
-void User::OnMessage(MessagePtr bin) {
+void User::OnMessage(uv_buf_t bin) {
   req_.Clear();
-  if (!req_.ParseFromArray(bin->data(), bin->size())) {
+  if (!req_.ParseFromArray(bin.base, bin.len)) {
     SendError(ErrType::Error_Type_InvalidRequest);
     return;
   }
@@ -70,6 +70,8 @@ void User::SendMessage(const proto::Message& msg) {
   res_.release_message();
 }
 
+// SendResponse sends the Response to the client,
+// and resets the instance's Response member, so that it can be reused
 void User::SendResponse() {
   auto bin = std::make_unique<Conn::Message>(res_.ByteSize());
   res_.SerializeToArray(bin->data(), bin->size());

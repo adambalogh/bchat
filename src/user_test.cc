@@ -4,25 +4,9 @@
 #include "user.h"
 #include "conn.h"
 #include "proto/message.pb.h"
+#include "test_util.h"
 
 using namespace ::testing;
-
-const std::string name = "Adam";
-
-class MockConn : public Conn {
- public:
-  // GMock cannot handle non-copyable parameters
-  void Send(const MessagePtr msg) { SendProxy(msg.get()); }
-
-  MOCK_METHOD2(OnRead, void(ssize_t, const uv_buf_t*));
-  MOCK_METHOD1(SendProxy, void(const Message*));
-};
-
-Conn::MessagePtr MakeMsg(std::string s) {
-  auto msg = std::make_unique<Conn::Message>(s.size());
-  std::copy(s.begin(), s.end(), msg->begin());
-  return std::move(msg);
-}
 
 TEST(UserRepo, Empty) {
   UserRepo repo;
@@ -43,7 +27,7 @@ TEST(User, InvalidRequest) {
 
   EXPECT_CALL(conn, SendProxy(Pointee(*bin)));
 
-  u.OnMessage(MakeMsg("\n"));
+  u.OnMessage(MakeBuf("\n"));
 }
 
 TEST(User, MustAuthenticateFirst) {
@@ -60,7 +44,8 @@ TEST(User, MustAuthenticateFirst) {
 
   proto::Request req;
   req.set_type(req.Message);
-  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  auto serialized = req.SerializeAsString();
+  u.OnMessage(MakeBuf(serialized));
 }
 
 TEST(User, UsernameTaken) {
@@ -73,7 +58,8 @@ TEST(User, UsernameTaken) {
   proto::Request req;
   req.set_type(req.Authentication);
   req.mutable_authentication()->set_name("Adam");
-  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  auto serialized = req.SerializeAsString();
+  u.OnMessage(MakeBuf(serialized));
 
   // Register 2nd user with same name
   MockConn conn2;
@@ -89,7 +75,8 @@ TEST(User, UsernameTaken) {
   req.Clear();
   req.set_type(req.Authentication);
   req.mutable_authentication()->set_name("Adam");
-  u2.OnMessage(MakeMsg(req.SerializeAsString()));
+  serialized = req.SerializeAsString();
+  u2.OnMessage(MakeBuf(serialized));
 }
 
 TEST(User, DiscconnectsUser) {
@@ -102,7 +89,9 @@ TEST(User, DiscconnectsUser) {
   // Register 1st User
   MockConn conn;
   User u{conn, repo};
-  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  auto serialized = req.SerializeAsString();
+  u.OnMessage(MakeBuf(serialized));
+
   u.OnDisconnect();
 
   // Register 2nd user with same name
@@ -114,7 +103,9 @@ TEST(User, DiscconnectsUser) {
   req.Clear();
   req.set_type(req.Authentication);
   req.mutable_authentication()->set_name("Adam");
-  u2.OnMessage(MakeMsg(req.SerializeAsString()));
+
+  serialized = req.SerializeAsString();
+  u2.OnMessage(MakeBuf(serialized));
 }
 
 TEST(User, MessageSend) {
@@ -125,7 +116,8 @@ TEST(User, MessageSend) {
   proto::Request req;
   req.set_type(req.Authentication);
   req.mutable_authentication()->set_name("Adam");
-  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  auto serialized = req.SerializeAsString();
+  u.OnMessage(MakeBuf(serialized));
 
   proto::Message message;
   message.set_content("Hello!");
@@ -143,7 +135,8 @@ TEST(User, MessageSend) {
 
   req.set_type(req.Message);
   *req.mutable_message() = message;
-  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  serialized = req.SerializeAsString();
+  u.OnMessage(MakeBuf(serialized));
 }
 
 int main(int argc, char** argv) {

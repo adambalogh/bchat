@@ -68,8 +68,6 @@ class ConnImpl : public Conn {
 
   Parser parser_;
 
-  std::array<uint8_t, 20000> buffer_;
-
   User user_;
 
   // C-style function adapters for libuv

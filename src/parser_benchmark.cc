@@ -1,23 +1,20 @@
 #include <benchmark/benchmark.h>
 
 #include "parser.h"
+#include "test_util.h"
+
+void handle(uv_buf_t msg) {}
 
 static void Sink(benchmark::State& state) {
   Parser p;
 
-  uint8_t size = 100;
-  uint8_t buf[]{0, 0, 0, size};
-  uint8_t msg[100];
-
-  std::vector<Parser::MessagePtr> messages;
+  Arr length{0, 0, 0, 100};
 
   while (state.KeepRunning()) {
-    p.Sink(buf, 4);
-    p.Sink(msg, size);
-    p.HasMessages();
-    messages = p.GetMessages();
+    SetBuf(p.GetBuf(), length);
+    p.Sink(4, handle);
+    p.Sink(100, handle);
   }
-  assert(messages[0]->size() == size);
 }
 
 BENCHMARK(Sink);

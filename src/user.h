@@ -5,6 +5,8 @@
 
 #include "proto/message.pb.h"
 
+#include "uv.h"
+
 class User;
 class Conn;
 
@@ -45,15 +47,13 @@ class UserRepo {
 //
 class User {
  public:
-  typedef std::unique_ptr<std::vector<uint8_t>> MessagePtr;
-
  private:
   typedef proto::Error::Type ErrType;
 
  public:
   User(Conn& conn, UserRepo& user_repo);
 
-  void OnMessage(MessagePtr msg);
+  void OnMessage(uv_buf_t msg);
 
   void OnDisconnect();
 

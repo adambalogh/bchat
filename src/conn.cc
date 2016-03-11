@@ -31,8 +31,7 @@ void ConnImpl::Start(uv_stream_t *const server) {
 }
 
 void ConnImpl::AllocBuffer(size_t suggested_size, uv_buf_t *buf) {
-  buf->base = reinterpret_cast<char *>(buffer_.data());
-  buf->len = buffer_.size();
+  *buf = parser_.GetBuf();
 }
 
 void ConnImpl::OnRead(ssize_t nread, const uv_buf_t *buf) {
@@ -42,13 +41,7 @@ void ConnImpl::OnRead(ssize_t nread, const uv_buf_t *buf) {
     }
     Close();
   } else if (nread > 0) {
-    parser_.Sink((uint8_t *)buf->base, nread);
-    if (parser_.HasMessages()) {
-      auto messages = parser_.GetMessages();
-      for (auto &msg : messages) {
-        user_.OnMessage(std::move(msg));
-      }
-    }
+    parser_.Sink(nread, [this](uv_buf_t buf) { user_.OnMessage(buf); });
   }
 }
 

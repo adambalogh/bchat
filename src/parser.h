@@ -110,9 +110,6 @@ class Parser {
     std::copy(Parsable(), FreeBuf(), buf_.begin());
     buf_size_ = ParsableSize();
     buf_parsed_size_ = 0;
-
-    assert(Parsable() == buf_.begin());
-    assert(ParsableSize() + FreeBufSize() == buf_.size());
   }
 
   void Advance(size_t size) {

@@ -5,12 +5,6 @@
 #include "proto/message.pb.h"
 #include "test_util.h"
 
-class EmptyConn : public Conn {
- public:
-  virtual void OnRead(ssize_t nread, const uv_buf_t* buf) {}
-  virtual void Send(const MessagePtr msg) { benchmark::DoNotOptimize(msg); }
-};
-
 static void Message(benchmark::State& state) {
   EmptyConn conn;
   UserRepo repo;
@@ -20,7 +14,8 @@ static void Message(benchmark::State& state) {
   req.set_type(req.Authentication);
   req.mutable_authentication()->set_name("Adam");
 
-  u.OnMessage(MakeMsg(req.SerializeAsString()));
+  auto bin = req.SerializeAsString();
+  u.OnMessage(MakeBuf(bin));
 
   req.Clear();
   req.set_type(req.Message);
@@ -33,11 +28,10 @@ static void Message(benchmark::State& state) {
       "vitae ornare libero pretium nec.");
 
   const auto serialized = req.SerializeAsString();
+  auto buf = MakeBuf(serialized);
 
   while (state.KeepRunning()) {
-    // TODO Dynamic memory allocation adds at least 50% to the benchmark times,
-    // get rid of it somehow
-    u.OnMessage(MakeMsg(serialized));
+    u.OnMessage(buf);
   }
 }
 

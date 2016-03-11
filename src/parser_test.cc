@@ -164,7 +164,7 @@ TEST(Parser, SeveralMsg) {
   expected.base = (char*)msg.data();
   expected.len = msg.size();
 
-  int rounds = 100;
+  int rounds = 1000;
   EXPECT_CALL(handle, Handle(expected)).Times(rounds);
 
   for (int i = 0; i < rounds; ++i) {
