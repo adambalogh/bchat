@@ -6,24 +6,48 @@ message Request {
   enum Type {
     Authentication = 0;
     Message = 1;
-    MessagesList = 2;
-    // Only the server should send errors
-    Error = 3;
+    MessagesListReq = 2;
   }
+
   required Type type = 1;
-  required bytes body = 2;
+  optional Authentication authentication = 2;
+  optional Message message = 3;
+  optional MessageListReq message_list_req = 4;
 }
 
-
 message Authentication {
-  // TODO real authentication
   required string name = 1;
 }
 
 message Message{
   optional string sender = 1;
-
   optional string recipient = 2;
-
   required string content = 3;
 }
+
+message MessageListReq {
+  // MessageListReq contains no additional information
+}
+
+message Response {
+  enum Type {
+    Message = 1;
+    MessageList = 3;
+    Error = 2;
+  }
+
+  required Type type = 1;
+  optional Message message = 2;
+  optional MessageList message_list = 3;
+  optional Error error = 4;
+}
+
+message MessageList {
+  repeated Message messages = 1;
+}
+
+message Error {
+  required string message = 1;
+}
+
+
