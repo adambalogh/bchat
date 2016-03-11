@@ -19,11 +19,11 @@ ConnImpl::WriteReq::WriteReq(ConnImpl *const ConnImpl, MessagePtr msg)
 
 void inline ConnImpl::Close() {
   user_.OnDisconnect();
-  uv_close((uv_handle_t *)this, Delete);
+  uv_close(handle(), Delete);
 }
 
 void ConnImpl::Start(uv_stream_t *const server) {
-  if (uv_accept(server, (uv_stream_t *)this) == 0) {
+  if (uv_accept(server, stream()) == 0) {
     uv_read_start(stream(), AllocBuffer, OnRead);
   } else {
     Close();

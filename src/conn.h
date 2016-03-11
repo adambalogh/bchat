@@ -42,7 +42,9 @@ class ConnImpl : public Conn {
  public:
   ConnImpl(uv_loop_t *const loop, UserRepo &user_repo)
       : user_(*this, user_repo) {
-    assert((void *)&socket_ == (void *)this);
+    socket_.data = this;
+    assert(socket_.data == (void *)this);
+
     uv_tcp_init(loop, &socket_);
   }
 
@@ -59,11 +61,9 @@ class ConnImpl : public Conn {
   void OnWriteFinished(WriteReq *req, int status);
 
  private:
-  uv_handle_t *handle() { return reinterpret_cast<uv_handle_t *>(this); }
-  uv_stream_t *stream() { return reinterpret_cast<uv_stream_t *>(this); }
+  uv_handle_t *handle() { return reinterpret_cast<uv_handle_t *>(&socket_); }
+  uv_stream_t *stream() { return reinterpret_cast<uv_stream_t *>(&socket_); }
 
-  // socket must be the first member, so that we can cast the this pointer to
-  // uv_handle_t*, a la C inheritance
   uv_tcp_t socket_;
 
   Parser parser_;
@@ -75,18 +75,19 @@ class ConnImpl : public Conn {
   // C-style function adapters for libuv
 
  public:
-  static inline void Delete(uv_handle_t *h) {
-    delete reinterpret_cast<ConnImpl *>(h);
+  static inline void Delete(uv_handle_t *handle) {
+    delete reinterpret_cast<ConnImpl *>(handle->data);
   }
 
   static inline void AllocBuffer(uv_handle_t *handle, size_t suggested_size,
                                  uv_buf_t *buf) {
-    reinterpret_cast<ConnImpl *>(handle)->AllocBuffer(suggested_size, buf);
+    reinterpret_cast<ConnImpl *>(handle->data)
+        ->AllocBuffer(suggested_size, buf);
   }
 
   static inline void OnRead(uv_stream_t *client, ssize_t nread,
                             const uv_buf_t *buf) {
-    reinterpret_cast<ConnImpl *>(client)->OnRead(nread, buf);
+    reinterpret_cast<ConnImpl *>(client->data)->OnRead(nread, buf);
   }
 
   static inline void OnWriteFinished(uv_write_t *uv_req, int status) {
