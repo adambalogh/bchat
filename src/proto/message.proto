@@ -52,6 +52,7 @@ message Error {
     MustAuthenticateFirst = 2;
     AlreadyAuthenticated = 3;
     UsernameTaken = 4;
+    UserNotOnline = 5;
   }
   required Type type = 1;
 }

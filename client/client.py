@@ -62,7 +62,7 @@ class Client(object):
 
     def recv(self):
         self.buf.extend(self.s.recv(10000))
-        if len(self.buf) >= 4:
+        while len(self.buf) >= 4:
             size = self.__decode(self.buf[:4])
             if len(self.buf) - 4 >= size:
                 self.buf = self.buf[4:]

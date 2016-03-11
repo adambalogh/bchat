@@ -33,9 +33,14 @@ void User::OnMessage(MessagePtr bin) {
 
   if (req.type() == req.Message) {
     assert(req.has_message() == true);
+
     proto::Message msg = req.message();
-    msg.set_sender(name_);
+    if (!user_repo_.Contains(msg.recipient())) {
+      SendError(ErrType::Error_Type_UserNotOnline);
+      return;
+    }
     auto recipient = user_repo_.Get(msg.recipient());
+    msg.set_sender(name_);
     recipient.SendMessage(msg);
   } else if (req.type() == req.MessagesListReq) {
     // return messages
