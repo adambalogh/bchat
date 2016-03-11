@@ -45,6 +45,10 @@ class User {
  public:
   typedef std::unique_ptr<std::vector<uint8_t>> MessagePtr;
 
+ private:
+  typedef proto::Error::Type ErrType;
+
+ public:
   User(Conn& conn, UserRepo& user_repo);
 
   void OnMessage(MessagePtr msg);
@@ -58,7 +62,7 @@ class User {
 
   void SendResponse(const proto::Response& res);
 
-  void SendErrorMsg(const std::string& error_msg);
+  void SendError(ErrType);
 
   Conn& conn_;
 

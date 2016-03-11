@@ -47,7 +47,13 @@ message MessageList {
 }
 
 message Error {
-  required string message = 1;
+  enum Type {
+    InvalidRequest = 1;
+    MustAuthenticateFirst = 2;
+    AlreadyAuthenticated = 3;
+    UsernameTaken = 4;
+  }
+  required Type type = 1;
 }
 
 

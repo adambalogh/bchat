@@ -10,7 +10,7 @@ User::User(Conn& conn, UserRepo& user_repo)
 void User::OnMessage(MessagePtr bin) {
   proto::Request req;
   if (!req.ParseFromArray(bin->data(), bin->size())) {
-    SendErrorMsg("Invalid request");
+    SendError(ErrType::Error_Type_InvalidRequest);
     return;
   }
 
@@ -20,11 +20,11 @@ void User::OnMessage(MessagePtr bin) {
       Authenticate(req.authentication());
       return;
     } else {
-      SendErrorMsg("You must authenticate yourself first");
+      SendError(ErrType::Error_Type_MustAuthenticateFirst);
       return;
     }
   } else if (req.type() == req.Authentication) {
-    SendErrorMsg("You are already authenticated");
+    SendError(ErrType::Error_Type_AlreadyAuthenticated);
     return;
   }
 
@@ -44,7 +44,7 @@ void User::OnMessage(MessagePtr bin) {
 
 void User::Authenticate(const proto::Authentication& auth) {
   if (user_repo_.Contains(auth.name())) {
-    SendErrorMsg("Username already taken");
+    SendError(ErrType::Error_Type_UsernameTaken);
     return;
   }
 
@@ -54,10 +54,10 @@ void User::Authenticate(const proto::Authentication& auth) {
   authenticated_ = true;
 }
 
-void User::SendErrorMsg(const std::string& error_msg) {
+void User::SendError(ErrType type) {
   proto::Response res;
   res.set_type(res.Error);
-  res.mutable_error()->set_message(error_msg);
+  res.mutable_error()->set_type(type);
   SendResponse(res);
 }
 
