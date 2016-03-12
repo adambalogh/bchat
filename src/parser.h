@@ -2,12 +2,9 @@
 
 #include <assert.h>
 #include <array>
-#include <cstdlib>
-#include <cstring>
-#include <memory>
-#include <sstream>
-#include <vector>
+#include <functional>
 #include <inttypes.h>
+#include <memory>
 
 #include "uv.h"
 
@@ -24,7 +21,7 @@ const size_t MIN_FREE_SPACE = 2000;
 //
 //   |                buf_size                 |                     |
 //   |                                         |                     |
-//   | buf_parsed_size   |    ParsableSize()   |      FreeSpace()    |
+//   | buf_parsed_size   |    ParsableSize()   |    FreeBufSize()    |
 //   |                   |                     |                     |
 //   ----------------------------------------------------------------
 //   | parsed, processed | has not been parsed | has not been filled |
@@ -75,7 +72,7 @@ class Parser {
           state_ = State::BODY;
         }
       } else if (state_ == State::BODY) {
-        // If we have the whole msg in buffer, handle it
+        // We have the whole message in the buffer
         if (ParsableSize() >= next_size_) {
           uv_buf_t buf;
           buf.base = reinterpret_cast<char*>(Parsable());
@@ -83,25 +80,26 @@ class Parser {
           handle(buf);
           Advance(next_size_);
           state_ = State::HEADER;
-        } else {
-          // If there is enough free space for the rest of the msg,
-          // break out of the loop and wait for it to be Sinked by the user
-          if (FreeBufSize() >= next_size_) {
+        }
+        // We need to wait until the user Sinks the rest of the message.
+        // Everything in Parsable() is part of this single message.
+        else {
+          // Rest of the message will fit in FreeBuf
+          if (FreeBufSize() >= next_size_ - ParsableSize()) {
             break;
           }
-          // If there is not enough space for the next message, even if we
-          // clear the buffer, we need to create a sufficiently large buffer for
-          // the next msg, this shouldn't happen very often
-          if (buf_.size() < next_size_) {
+          // Rest of the message doesn't fit in FreeBuf, but if we remove the
+          // already processed part of the buffer, we can make enough space
+          else if (next_size_ <= buf_.size()) {
+            DeleteUsed();
+          }
+          // There is not enough space for the next message, even if we
+          // clear the buffer, so we need to create a sufficiently large buffer
+          // only for the next msg. This should happen very rarely.
+          else {
             // TODO handle this case
             printf("This should not happen\n");
             exit(1);
-          }
-          // If the next msg can fit in the buffer after we remove the already
-          // parsed data, do so
-          else {
-            DeleteUsed();
-            break;
           }
         }
       }

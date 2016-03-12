@@ -157,8 +157,8 @@ TEST(Parser, SeveralMsg) {
   Parser p;
   MockHandle handle;
 
-  Arr length{0, 0, 0, 100};
-  Arr msg(100);
+  Arr length{0, 0, 0, 101};
+  Arr msg(101);
 
   uv_buf_t expected;
   expected.base = (char*)msg.data();
@@ -169,9 +169,9 @@ TEST(Parser, SeveralMsg) {
 
   for (int i = 0; i < rounds; ++i) {
     SetBuf(p.GetBuf(), length);
-    p.Sink(4, HANDLE(handle));
+    p.Sink(length.size(), HANDLE(handle));
     SetBuf(p.GetBuf(), msg);
-    p.Sink(100, HANDLE(handle));
+    p.Sink(msg.size(), HANDLE(handle));
   }
 }
 
