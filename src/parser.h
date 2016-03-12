@@ -12,7 +12,9 @@
 #include "uv.h"
 
 const size_t LENGTH_SIZE = 4;
-const size_t MIN_FREE_SPACE = 1000;
+
+const size_t BUFFER_SIZE = 20000;
+const size_t MIN_FREE_SPACE = 2000;
 
 // Parser provides an efficient and convenient way of reading messages
 // that are prefixed with their length in bytes.
@@ -20,19 +22,19 @@ const size_t MIN_FREE_SPACE = 1000;
 // The layout of the parser's buffer is as follows:
 //
 //
-//   |              buf_size                 |                     |
-//   |                                       |                     |
-//   | buf_parsed_size |    ParsableSize()   |      FreeSpace()    |
-//   |                 |                     |                     |
-//   --------------------------------------------------------------
-//   | already parsed  | has not been parsed | has not been filled |
-//   --------------------------------------------------------------
-//                Parsable()             FreeBuf()
+//   |                buf_size                 |                     |
+//   |                                         |                     |
+//   | buf_parsed_size   |    ParsableSize()   |      FreeSpace()    |
+//   |                   |                     |                     |
+//   ----------------------------------------------------------------
+//   | parsed, processed | has not been parsed | has not been filled |
+//   -----------------------------------------------------------------
+//                    Parsable()             FreeBuf()
 //
 // Example usage:
 //
 //   Parser p;
-//   auto written = FillBuf(p.GetBuf()); // e.g. from network
+//   size_t written = FillBuf(p.GetBuf()); // e.g. from network
 //   p.Sink(written, ...);
 //
 class Parser {
@@ -95,8 +97,8 @@ class Parser {
             printf("This should not happen\n");
             exit(1);
           }
-          // If the next msg can fit in the buffer, free up the part of the
-          // buffer that has already been parsed
+          // If the next msg can fit in the buffer after we remove the already
+          // parsed data, do so
           else {
             DeleteUsed();
             break;
@@ -114,6 +116,8 @@ class Parser {
   }
 
  private:
+  // Clears the part of the buffer that has already been parsed and handled by
+  // the user
   void DeleteUsed() {
     std::copy(Parsable(), FreeBuf(), buf_.begin());
     buf_size_ = ParsableSize();
@@ -125,14 +129,6 @@ class Parser {
     assert(buf_parsed_size_ <= buf_size_);
   }
 
-  uint8_t* Parsable() { return buf_.data() + buf_parsed_size_; }
-  const uint8_t* Parsable() const { return buf_.data() + buf_parsed_size_; }
-  size_t ParsableSize() const { return buf_size_ - buf_parsed_size_; }
-
-  uint8_t* FreeBuf() { return buf_.data() + buf_size_; }
-  const uint8_t* FreeBuf() const { return buf_.data() + buf_size_; }
-  size_t FreeBufSize() const { return buf_.size() - buf_size_; }
-
   // Converts length_buf to size_t
   size_t DecodeSize(const uint8_t* buf) {
     size_t size = 0;
@@ -142,13 +138,21 @@ class Parser {
     return size;
   }
 
+  uint8_t* Parsable() { return buf_.data() + buf_parsed_size_; }
+  const uint8_t* Parsable() const { return buf_.data() + buf_parsed_size_; }
+  size_t ParsableSize() const { return buf_size_ - buf_parsed_size_; }
+
+  uint8_t* FreeBuf() { return buf_.data() + buf_size_; }
+  const uint8_t* FreeBuf() const { return buf_.data() + buf_size_; }
+  size_t FreeBufSize() const { return buf_.size() - buf_size_; }
+
  private:
   State state_ = State::HEADER;
 
-  // We assume that the majority of the messages will be shorter than 10KB, so
-  // they all fit in this buffer, in case they do not we need to allocate an
-  // extra buffer only for that message.
-  std::array<uint8_t, 10000> buf_;
+  // We assume that the majority of the messages will be shorter than
+  // BUFFER_SIZE, so they all fit in this buffer. In case they do not,
+  // we need to allocate an extra buffer only for that message.
+  std::array<uint8_t, BUFFER_SIZE> buf_;
 
   // See class comments for explanation
   size_t buf_parsed_size_ = 0;

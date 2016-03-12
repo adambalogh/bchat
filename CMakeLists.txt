@@ -21,7 +21,7 @@ target_link_libraries(parser_test gmock gtest)
 
 add_executable(parser_benchmark src/parser_benchmark.cc)
 set_target_properties(parser_benchmark 
-  PROPERTIES COMPILE_FLAGS "-O3")
+  PROPERTIES COMPILE_FLAGS "-O3 -DNDEBUG")
 target_link_libraries(parser_benchmark benchmark)
 
 add_executable(user_test src/user_test.cc src/user.cc src/proto/message.pb.cc)

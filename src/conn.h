@@ -9,6 +9,8 @@
 #include "parser.h"
 #include "user.h"
 
+// Conn is a wrapper around a socket
+//
 class Conn {
  public:
   typedef std::vector<uint8_t> Message;
@@ -20,6 +22,8 @@ class Conn {
   virtual void Send(const MessagePtr msg) = 0;
 };
 
+// ConnImpl implements Conn using libuv tcp sockets
+//
 class ConnImpl : public Conn {
  private:
   class WriteReq {

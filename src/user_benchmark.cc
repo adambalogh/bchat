@@ -24,7 +24,6 @@ static void Message(benchmark::State& state) {
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus eget "
       "lectus nec arcu convallis tempus nec vel velit. Nunc eu libero dolor. "
       "Sed ultrices vehicula sem eu molestie. Aenean et tellus at tortor "
-      "efficitur consectetur eu vitae dui. Quisque maximus lectus libero, "
       "vitae ornare libero pretium nec.");
 
   const auto serialized = req.SerializeAsString();

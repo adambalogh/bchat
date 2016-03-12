@@ -17,7 +17,6 @@ class UserRepo {
     if (Contains(name)) {
       return false;
     }
-
     users_[name] = user;
     return true;
   }
@@ -53,8 +52,10 @@ class User {
  public:
   User(Conn& conn, UserRepo& user_repo);
 
+  // OnMessage is called when the user has sent a message to the server
   void OnMessage(uv_buf_t msg);
 
+  // OnDisconnect is called when the user has disconnected from the server
   void OnDisconnect();
 
  private:
@@ -75,9 +76,9 @@ class User {
 
   UserRepo& user_repo_;
 
-  // Reuse response, for fewer memory allocation
+  // Reused for fewer memory allocations
   proto::Request req_;
 
-  // Reuse response, for fewer memory allocations
+  // Reused for fewer memory allocations
   proto::Response res_;
 };
