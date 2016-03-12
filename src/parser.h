@@ -65,6 +65,9 @@ class Parser {
     while (ParsableSize() > 0) {
       if (state_ == State::HEADER) {
         if (ParsableSize() < LENGTH_SIZE) {
+          if (FreeBufSize() < LENGTH_SIZE) {
+            DeleteUsed();
+          }
           break;
         } else {
           next_size_ = DecodeSize(Parsable());
@@ -92,6 +95,7 @@ class Parser {
           // already processed part of the buffer, we can make enough space
           else if (next_size_ <= buf_.size()) {
             DeleteUsed();
+            break;
           }
           // There is not enough space for the next message, even if we
           // clear the buffer, so we need to create a sufficiently large buffer
