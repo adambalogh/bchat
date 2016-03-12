@@ -38,11 +38,10 @@ void User::OnMessage(uv_buf_t bin) {
       return;
     }
 
-    proto::Message msg;
-    msg.Swap(req_.mutable_message());
-    auto recipient = user_repo_.Get(msg.recipient());
-    msg.set_sender(name_);
-    recipient.SendMessage(msg);
+    std::unique_ptr<proto::Message> msg(req_.release_message());
+    auto recipient = user_repo_.Get(msg->recipient());
+    msg->set_sender(name_);
+    recipient.SendMessage(*msg);
   } else if (req_.type() == req_.MessagesListReq) {
     // return messages
   }

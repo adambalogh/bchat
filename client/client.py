@@ -1,6 +1,7 @@
 #! /usr/local/bin/python3
 
 import socket
+import threading
 import message_pb2
 
 PORT = 7002
@@ -10,6 +11,10 @@ class Client(object):
         self.s = self.__get_socket()
         self.__register(name)
         self.buf = []
+
+        # TODO shutdown thread 
+        t = threading.Thread(target=self.__recv)
+        t.start()
 
     def __get_socket(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -60,12 +65,13 @@ class Client(object):
         if res.type == res.Message:
             print 'Message from {}: {}'.format(res.message.sender, res.message.content)
 
-    def recv(self):
-        self.buf.extend(self.s.recv(10000))
-        while len(self.buf) >= 4:
-            size = self.__decode(self.buf[:4])
-            if len(self.buf) - 4 >= size:
-                self.buf = self.buf[4:]
-                self.__parse_proto(self.buf[:size])
-                self.buf = self.buf[size:]
+    def __recv(self):
+        while True:
+            self.buf.extend(self.s.recv(10000))
+            while len(self.buf) >= 4:
+                size = self.__decode(self.buf[:4])
+                if len(self.buf) - 4 >= size:
+                    self.buf = self.buf[4:]
+                    self.__parse_proto(self.buf[:size])
+                    self.buf = self.buf[size:]
 
