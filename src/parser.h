@@ -64,15 +64,12 @@ class Parser {
 
     while (ParsableSize() > 0) {
       if (state_ == State::HEADER) {
-        if (ParsableSize() < LENGTH_SIZE) {
-          if (FreeBufSize() < LENGTH_SIZE) {
-            DeleteUsed();
-          }
-          break;
-        } else {
+        if (ParsableSize() >= LENGTH_SIZE) {
           next_size_ = DecodeSize(Parsable());
           Advance(LENGTH_SIZE);
           state_ = State::BODY;
+        } else {
+          break;
         }
       } else if (state_ == State::BODY) {
         // We have the whole message in the buffer
@@ -83,37 +80,38 @@ class Parser {
           handle(buf);
           Advance(next_size_);
           state_ = State::HEADER;
-        }
-        // We need to wait until the user Sinks the rest of the message.
-        // Everything in Parsable() is part of this single message.
-        else {
-          // Rest of the message will fit in FreeBuf
-          if (FreeBufSize() >= next_size_ - ParsableSize()) {
-            break;
-          }
-          // Rest of the message doesn't fit in FreeBuf, but if we remove the
-          // already processed part of the buffer, we can make enough space
-          else if (next_size_ <= buf_.size()) {
-            DeleteUsed();
-            break;
-          }
-          // There is not enough space for the next message, even if we
-          // clear the buffer, so we need to create a sufficiently large buffer
-          // only for the next msg. This should happen very rarely.
-          else {
-            // TODO handle this case
-            printf("This should not happen\n");
-            exit(1);
-          }
+        } else {
+          break;
         }
       }
     }
 
-    // Try to make sure that there is always at leat MIN_FREE_SPACE free space
-    // in the buffer. This may not always be possible, e.g. if the size of the
-    // next message is close to the maximum size of the buffer.
+    // Make sure there is never less than MIN_FREE_SPACE free space in
+    // the buffer.
+    //
+    // This may not always be possible, e.g. if the size of the next message is
+    // close to the maximum size of the buffer, but it's okay in those cases.
     if (FreeBufSize() < MIN_FREE_SPACE) {
       DeleteUsed();
+    }
+
+    // If we are expecting a message, make sure there is enough space for it, as
+    // it may be greater than MIN_FREE_SPACE
+    if (state_ == State::BODY) {
+      // Rest of the message will not fit in FreeBuf
+      if (FreeBufSize() < next_size_ - ParsableSize()) {
+        // If we clear the buffer, we can make enough space
+        if (next_size_ <= buf_.size()) {
+          DeleteUsed();
+        }
+        // There is not enough space, even if we clear the buffer, so we need to
+        // create a sufficiently large buffer only for the next msg.
+        // This should happen very rarely.
+        else {
+          // TODO handle this case
+          exit(1);
+        }
+      }
     }
   }
 

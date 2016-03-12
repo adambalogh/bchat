@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "parser.h"
+#include "util.h"
 #include "test_util.h"
 
 #define HANDLE(handle) [&handle](uv_buf_t buf) { handle.Handle(buf); }
@@ -175,18 +176,36 @@ TEST(Parser, SeveralMsg) {
   }
 }
 
-// TEST(Parser, ExtraLargeMsg) {
-//  Parser p;
-//  MockHandle handle;
+TEST(Parser, BufferSizedMessage) {
+  Parser p;
+  MockHandle handle;
 
-//  Arr length{0, 100, 100, 100};
-//  Arr msg(1000);
+  auto length = SerializeSize(BUFFER_SIZE);
+  Arr msg(BUFFER_SIZE);
 
-//  SetBuf(p.GetBuf(), length);
-//  p.Sink(4, HANDLE(handle));
-//  SetBuf(p.GetBuf(), msg);
-//  p.Sink(100, HANDLE(handle));
-//}
+  SetBuf(p.GetBuf(), Arr{length.begin(), length.end()});
+  p.Sink(4, HANDLE(handle));
+
+  uv_buf_t expected;
+  expected.base = (char*)msg.data();
+  expected.len = msg.size();
+  EXPECT_CALL(handle, Handle(expected)).Times(1);
+
+  SetBuf(p.GetBuf(), msg);
+  p.Sink(msg.size(), HANDLE(handle));
+
+  EXPECT_GE(p.GetBuf().len, MIN_FREE_SPACE);
+}
+
+TEST(Parser, TooLargeMessage) {
+  Parser p;
+  MockHandle handle;
+
+  auto length = SerializeSize(BUFFER_SIZE * 2);
+
+  SetBuf(p.GetBuf(), Arr{length.begin(), length.end()});
+  ASSERT_DEATH(p.Sink(4, HANDLE(handle)), "");
+}
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
