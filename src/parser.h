@@ -13,6 +13,9 @@ const size_t LENGTH_SIZE = 4;
 const size_t BUFFER_SIZE = 20000;
 const size_t MIN_FREE_SPACE = 2000;
 
+static_assert(MIN_FREE_SPACE > LENGTH_SIZE,
+              "MIN_FREE_SPACE must be greater than LENGTH_SIZE");
+
 // Parser provides an efficient and convenient way of reading messages
 // that are prefixed with their length in bytes.
 //
@@ -109,6 +112,7 @@ class Parser {
         // This should happen very rarely.
         else {
           // TODO handle this case
+          printf("Message too large\n");
           exit(1);
         }
       }

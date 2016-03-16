@@ -7,7 +7,8 @@
 #include "util.h"
 #include "test_util.h"
 
-#define HANDLE(handle) [&handle](uv_buf_t buf) { handle.Handle(buf); }
+#define HANDLE(handle_obj) \
+  [&handle_obj](uv_buf_t buf) { handle_obj.Handle(buf); }
 
 using namespace ::testing;
 
