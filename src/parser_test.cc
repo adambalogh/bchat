@@ -11,6 +11,7 @@
   [&handle_obj](uv_buf_t buf) { handle_obj.Handle(buf); }
 
 using namespace ::testing;
+using namespace bchat;
 
 class HandleInterface {
  public:

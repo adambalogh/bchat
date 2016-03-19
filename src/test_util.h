@@ -1,10 +1,15 @@
+#pragma once
+
+#include <assert.h>
+#include <string>
+
 #include <gmock/gmock.h>
 #include <benchmark/benchmark.h>
 
-#include "conn.h"
+#include "sender.h"
 
-Conn::MessagePtr MakeMsg(std::string s) {
-  auto msg = std::make_unique<Conn::Message>(s.size());
+bchat::MessagePtr MakeMsg(std::string s) {
+  auto msg = std::make_unique<bchat::Message>(s.size());
   std::copy(s.begin(), s.end(), msg->begin());
   return std::move(msg);
 }
@@ -15,21 +20,6 @@ uv_buf_t MakeBuf(const std::string& s) {
   buf.base = (char*)s.data();
   return buf;
 }
-
-class EmptyConn : public Conn {
- public:
-  virtual void OnRead(ssize_t nread, const uv_buf_t* buf) {}
-  virtual void Send(const MessagePtr msg) { benchmark::DoNotOptimize(msg); }
-};
-
-class MockConn : public Conn {
- public:
-  // GMock cannot handle non-copyable parameters
-  void Send(const MessagePtr msg) { SendProxy(msg.get()); }
-
-  MOCK_METHOD2(OnRead, void(ssize_t, const uv_buf_t*));
-  MOCK_METHOD1(SendProxy, void(const Message*));
-};
 
 typedef std::vector<uint8_t> Arr;
 
@@ -42,3 +32,16 @@ void SetBuf(uv_buf_t dest, uint8_t* values, size_t size) {
   assert(dest.len >= size);
   std::copy(values, values + size, dest.base);
 }
+
+class EmptySender : public bchat::Sender {
+ public:
+  void Send(bchat::MessagePtr msg) { benchmark::DoNotOptimize(msg); }
+};
+
+class MockSender : public bchat::Sender {
+ public:
+  // GMock cannot handle non-copyable parameters
+  void Send(bchat::MessagePtr msg) { SendProxy(msg.get()); }
+
+  MOCK_METHOD1(SendProxy, void(const bchat::Message*));
+};

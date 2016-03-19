@@ -3,6 +3,8 @@
 #include "parser.h"
 #include "test_util.h"
 
+using namespace bchat;
+
 void handle(uv_buf_t msg) {}
 
 static void Sink(benchmark::State& state) {

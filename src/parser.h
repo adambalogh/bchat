@@ -8,6 +8,8 @@
 
 #include "uv.h"
 
+namespace bchat {
+
 const size_t LENGTH_SIZE = 4;
 
 const size_t BUFFER_SIZE = 20000;
@@ -165,3 +167,4 @@ class Parser {
   // The size of the next message we are expecting, in bytes
   size_t next_size_ = 0;
 };
+}
