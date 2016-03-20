@@ -1,6 +1,6 @@
 #include <benchmark/benchmark.h>
 
-#include "chat/user.h"
+#include "chat/server_context.h"
 #include "proto/message.pb.h"
 #include "test_util.h"
 
@@ -8,8 +8,8 @@ using namespace bchat::chat;
 
 static void Message(benchmark::State& state) {
   EmptySender sender;
-  UserRepo repo;
-  User u{sender, repo};
+  ServerContext sc;
+  User u{sender, sc};
 
   proto::Request req;
   req.set_type(req.Authentication);

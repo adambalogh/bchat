@@ -1,13 +1,15 @@
 #include "user.h"
 
 #include "conn_base.h"
+#include "chat/server_context.h"
+#include "chat/server_context.h"
 #include "proto/message.pb.h"
 
 namespace bchat {
 namespace chat {
 
-User::User(Sender& sender, UserRepo& user_repo)
-    : sender_(sender), user_repo_(user_repo) {}
+User::User(Sender& sender, ServerContext& server_context)
+    : sender_(sender), sc_(server_context) {}
 
 void User::OnMessage(uv_buf_t bin) {
   req_.Clear();
@@ -35,13 +37,13 @@ void User::OnMessage(uv_buf_t bin) {
 
   if (req_.type() == req_.Message) {
     assert(req_.has_message() == true);
-    if (!user_repo_.Contains(req_.message().recipient())) {
+    if (!sc_.online_users().Contains(req_.message().recipient())) {
       SendError(ErrType::Error_Type_UserNotOnline);
       return;
     }
 
     std::unique_ptr<proto::Message> msg(req_.release_message());
-    auto& recipient = user_repo_.Get(msg->recipient());
+    auto& recipient = sc_.online_users().Get(msg->recipient());
     // Avoid unnecessary memory allocation
     msg->set_allocated_sender(&name_);
     recipient.SendMessage(*msg);
@@ -54,7 +56,7 @@ void User::OnMessage(uv_buf_t bin) {
 }
 
 void User::Authenticate(const proto::Authentication& auth) {
-  if (!user_repo_.Register(auth.name(), this)) {
+  if (!sc_.online_users().Register(auth.name(), this)) {
     SendError(ErrType::Error_Type_UsernameTaken);
     return;
   }
@@ -84,7 +86,7 @@ void User::SendResponse() {
   res_.Clear();
 }
 
-void User::OnDisconnect() { user_repo_.Remove(name_); }
+void User::OnDisconnect() { sc_.online_users().Remove(name_); }
 
 void User::OnConnect() {}
 }

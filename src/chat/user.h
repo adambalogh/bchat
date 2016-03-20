@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assert.h>
+#include <string>
 #include <unordered_map>
 
 #include "uv.h"
@@ -11,35 +12,8 @@
 namespace bchat {
 namespace chat {
 
-class User;
-
-class UserRepo {
- public:
-  bool Register(const std::string& name, User* user) {
-    assert(user != nullptr);
-    if (Contains(name)) {
-      return false;
-    }
-    users_[name] = user;
-    return true;
-  }
-
-  User& Get(const std::string& name) { return *users_.at(name); }
-
-  bool Contains(const std::string& name) const {
-    return users_.count(name) == 1;
-  }
-
-  void Remove(const std::string& name) {
-    auto user = users_.find(name);
-    if (user != users_.end()) {
-      users_.erase(user);
-    }
-  }
-
- private:
-  std::unordered_map<std::string, User*> users_;
-};
+class UserRepo;
+class ServerContext;
 
 // User contains the chat's application logic.
 //
@@ -52,7 +26,7 @@ class User {
   typedef proto::Error::Type ErrType;
 
  public:
-  User(Sender& sender, UserRepo& user_repo);
+  User(Sender& sender, ServerContext& server_context);
 
   // OnMessage is called when the user has sent a message to the server
   void OnMessage(uv_buf_t msg);
@@ -78,7 +52,7 @@ class User {
 
   std::string name_;
 
-  UserRepo& user_repo_;
+  ServerContext& sc_;
 
   // Reused for fewer memory allocations
   proto::Request req_;

@@ -1,24 +1,25 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "user.h"
+#include "chat/user.h"
+#include "chat/server_context.h"
 #include "../proto/message.pb.h"
 #include "../test_util.h"
 
 using namespace ::testing;
 using namespace bchat::chat;
 
-TEST(UserRepo, Empty) {
-  UserRepo repo;
-  EXPECT_FALSE(repo.Contains(""));
-  EXPECT_FALSE(repo.Contains("a"));
-  EXPECT_NO_THROW(repo.Remove(""));
+TEST(ServerContext, Empty) {
+  ServerContext sc;
+  EXPECT_FALSE(sc.online_users().Contains(""));
+  EXPECT_FALSE(sc.online_users().Contains("a"));
+  EXPECT_NO_THROW(sc.online_users().Remove(""));
 }
 
 TEST(User, InvalidRequest) {
   MockSender sender;
-  UserRepo repo;
-  User u{sender, repo};
+  ServerContext sc;
+  User u{sender, sc};
 
   proto::Response res;
   res.set_type(res.Error);
@@ -32,8 +33,8 @@ TEST(User, InvalidRequest) {
 
 TEST(User, MustAuthenticateFirst) {
   MockSender sender;
-  UserRepo repo;
-  User u{sender, repo};
+  ServerContext sc;
+  User u{sender, sc};
 
   proto::Response res;
   res.set_type(res.Error);
@@ -49,11 +50,11 @@ TEST(User, MustAuthenticateFirst) {
 }
 
 TEST(User, UsernameTaken) {
-  UserRepo repo;
+  ServerContext sc;
 
   // Register 1st User
   MockSender sender;
-  User u{sender, repo};
+  User u{sender, sc};
 
   proto::Request req;
   req.set_type(req.Authentication);
@@ -63,7 +64,7 @@ TEST(User, UsernameTaken) {
 
   // Register 2nd user with same name
   MockSender sender2;
-  User u2{sender2, repo};
+  User u2{sender2, sc};
 
   proto::Response res;
   res.set_type(res.Error);
@@ -80,7 +81,7 @@ TEST(User, UsernameTaken) {
 }
 
 TEST(User, DiscconnectsUser) {
-  UserRepo repo;
+  ServerContext sc;
 
   proto::Request req;
   req.set_type(req.Authentication);
@@ -88,7 +89,7 @@ TEST(User, DiscconnectsUser) {
 
   // Register 1st User
   MockSender sender;
-  User u{sender, repo};
+  User u{sender, sc};
   auto serialized = req.SerializeAsString();
   u.OnMessage(MakeBuf(serialized));
 
@@ -96,7 +97,7 @@ TEST(User, DiscconnectsUser) {
 
   // Register 2nd user with same name
   MockSender sender2;
-  User u2{sender2, repo};
+  User u2{sender2, sc};
 
   EXPECT_CALL(sender2, SendProxy(_)).Times(0);
 
@@ -110,8 +111,8 @@ TEST(User, DiscconnectsUser) {
 
 TEST(User, MessageSend) {
   MockSender sender;
-  UserRepo repo;
-  User u{sender, repo};
+  ServerContext sc;
+  User u{sender, sc};
 
   proto::Request req;
   req.set_type(req.Authentication);

@@ -9,6 +9,7 @@
 
 #include "server_base.h"
 #include "conn_base.h"
+#include "chat/server_context.h"
 #include "chat/user.h"
 
 #define DEFAULT_PORT 7002
@@ -27,12 +28,12 @@ class Server : public ServerBase {
       fprintf(stderr, "New connection error %s\n", uv_strerror(status));
       return;
     }
-    auto *conn = new conn::ConnBase<User>(loop_, users_);
+    auto *conn = new conn::ConnBase<User>(loop_, context_);
     conn->Start(reinterpret_cast<uv_stream_t *>(&socket_));
   }
 
  private:
-  UserRepo users_;
+  ServerContext context_;
 };
 }
 }
