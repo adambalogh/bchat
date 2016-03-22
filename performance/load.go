@@ -20,10 +20,10 @@ import (
 // size must fit in 4 bytes
 func Size(size int) []byte {
 	out := make([]byte, 4)
-	out[0] = byte(size & 0xff)
-	out[1] = byte((size >> 1) & 0xff)
-	out[2] = byte((size >> 2) & 0xff)
-	out[3] = byte((size >> 3) & 0xff)
+	out[0] = byte((size >> 24) & 0xff)
+	out[1] = byte((size >> 16) & 0xff)
+	out[2] = byte((size >> 8) & 0xff)
+	out[3] = byte((size >> 0) & 0xff)
 	return out
 }
 
