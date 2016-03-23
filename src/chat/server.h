@@ -12,7 +12,6 @@
 #include "chat/server_context.h"
 #include "chat/user.h"
 
-#define DEFAULT_PORT 7002
 #define DEFAULT_BACKLOG 128
 
 namespace bchat {
@@ -20,8 +19,8 @@ namespace chat {
 
 class Server : public ServerBase {
  public:
-  Server(uv_loop_t *const loop)
-      : ServerBase(DEFAULT_PORT, DEFAULT_BACKLOG, loop) {}
+  Server(uv_loop_t *const loop, int port)
+      : ServerBase(port, DEFAULT_BACKLOG, loop) {}
 
   void OnNewConnection(int status) override {
     if (status < 0) {
