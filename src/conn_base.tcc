@@ -18,10 +18,10 @@ template <typename A>
 void ConnBase<A>::Start(uv_stream_t *const server) {
   if (uv_accept(server, stream()) == 0) {
     uv_read_start(stream(), AllocBuffer, OnRead);
+    app_.OnConnect();
   } else {
     Close();
   }
-  app_.OnConnect();
 }
 
 template <typename A>
