@@ -13,10 +13,10 @@
 namespace bchat {
 namespace conn {
 
-// ConnInterface implementation using libuv tcp socket.
+// ConnBase contains the communication protocol.
 //
-// Type A should contain the application logic.
-// It must implement the following interface:
+// Each message received is passed to A, which contains the application logic.
+// A must implement the following interface:
 //
 //   class A {
 //   public:

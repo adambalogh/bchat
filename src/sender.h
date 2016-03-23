@@ -12,6 +12,8 @@ namespace bchat {
 typedef std::vector<uint8_t> Message;
 typedef std::unique_ptr<Message> MessagePtr;
 
+// Sender can be used to send messages to the client
+//
 class Sender {
  public:
   virtual ~Sender() {}
