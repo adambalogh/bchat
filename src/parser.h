@@ -114,7 +114,7 @@ class Parser {
         // This should happen very rarely.
         else {
           // TODO handle this case
-          printf("Message too large\n");
+          printf("Message too large %lu\n", next_size_);
           exit(1);
         }
       }
