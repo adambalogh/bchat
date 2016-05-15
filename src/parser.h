@@ -36,8 +36,8 @@ static_assert(MIN_FREE_SPACE > LENGTH_SIZE,
 // Example usage:
 //
 //   Parser p;
-//   size_t written = FillBuf(p.GetBuf()); // e.g. from network
-//   p.Sink(written, ...);
+//   size_t written = MyFillBufferFunction(p.GetBuf()); // e.g. from network
+//   p.Sink(written, my_handle);
 //
 class Parser {
  private:
@@ -58,8 +58,6 @@ class Parser {
 
   // Sink parses the given buffer, and calls handle for each message that is
   // fully available.
-  //
-  // It does not take ownership of the given buffer.
   void Sink(const size_t size, Handle handle) {
     assert(size >= 0);
     assert(buf_size_ + size <= buf_.size());
